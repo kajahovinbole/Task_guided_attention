@@ -8,13 +8,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
-from timm.models.helpers import build_model_with_cfg, named_apply, adapt_input_conv
-from timm.models.layers.helpers import to_2tuple
-from timm.models.layers import PatchEmbed, Mlp, DropPath, trunc_normal_, lecun_normal_#,PatchEmbed
-from timm.models.registry import register_model
-from timm.models.vision_transformer import _cfg
-from config import config
+from timm.data import (
+    IMAGENET_DEFAULT_MEAN,
+    IMAGENET_DEFAULT_STD,
+    IMAGENET_INCEPTION_MEAN,
+    IMAGENET_INCEPTION_STD,
+)
+from timm.models._builder import build_model_with_cfg
+from timm.models._manipulate import adapt_input_conv, named_apply
+from timm.layers.helpers import to_2tuple
+from timm.layers import PatchEmbed, Mlp, DropPath, trunc_normal_, lecun_normal_
+from timm.models import register_model
+from timm.models.vision_transformer import default_cfgs
 
 _logger = logging.getLogger(__name__)
 
@@ -265,14 +270,14 @@ class VisionTransformer(nn.Module):
         else:
             return x
 
-    def var_loss(self, in_var, out_var, x):
+    def var_loss(self, in_var, out_var, x, var_loss_weight=1.0):
         recon_loss = []
         for depth in range(len(self.decoders) - 1, -1, -1):
             recon, out = self.decoders[depth](out_var[depth].detach())
             target = in_var[depth].detach()
             recon_loss.append(F.mse_loss(recon, target))
 
-        return config['var_loss']*sum(recon_loss)
+        return var_loss_weight * sum(recon_loss)
 
 
 def init_weights_vit_timm(module: nn.Module, name: str = ''):
@@ -284,7 +289,21 @@ def init_weights_vit_timm(module: nn.Module, name: str = ''):
     elif hasattr(module, 'init_weights'):
         module.init_weights()
 
-
+def _cfg(url="", **kwargs):
+    return {
+        "url": url,
+        "num_classes": 1000,
+        "input_size": (3, 224, 224),
+        "pool_size": None,
+        "crop_pct": 0.9,
+        "interpolation": "bicubic",
+        "fixed_input_size": True,
+        "mean": IMAGENET_DEFAULT_MEAN,
+        "std": IMAGENET_DEFAULT_STD,
+        "first_conv": "patch_embed.proj",
+        "classifier": "head",
+        **kwargs,
+    }
 
 @register_model
 def absvit_tiny_patch16_224(pretrained=False, **kwargs):
