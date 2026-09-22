@@ -1,0 +1,14 @@
+# Miljø
+.venv/
+__pycache__/
+*.pyc
+
+# Data og sjekkpunkter 
+data/
+checkpoints/
+*.pt
+*.pth
+*.tar.gz
+
+# Jupyter-mellomlagring
+.ipynb_checkpoints/
