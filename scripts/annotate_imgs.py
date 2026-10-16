@@ -14,7 +14,7 @@ image_paths = sorted(
 if not image_paths:
     raise ValueError(f"Fant ingen bilder i {IMAGE_DIR.resolve()}")
 
-dataset = fo.Dataset("pointing_poc")
+dataset = fo.Dataset("pointing_poc_1")
 
 for path in image_paths:
     sample = fo.Sample(filepath=str(path.resolve()))
