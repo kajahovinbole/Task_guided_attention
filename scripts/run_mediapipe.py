@@ -9,10 +9,10 @@ from mediapipe.tasks.python import vision
 
 # Paths
 ROOT = Path(__file__).resolve().parent.parent
-IMAGE_DIR = ROOT / "data" / "exported" / "data"
+IMAGE_DIR = ROOT / "data" / "exported" / "merged" / "data"
 MODEL_PATH = ROOT / "models" / "mediapipe" / "hand_landmarker.task"
-OUTPUT_JSON = ROOT / "data" / "mediapipe_results.json"
-VIS_DIR = ROOT / "data" / "results_mediapipe" / "test_16okt" / "mediapipe_visualizations_3"
+OUTPUT_JSON = ROOT / "data" / "mediapipe_results_merged1.json"
+VIS_DIR = ROOT / "data" / "results_mediapipe" / "test_18okt" / "mediapipe_visualizations_merged1"
 
 
 VIS_DIR.mkdir(parents=True, exist_ok=True)

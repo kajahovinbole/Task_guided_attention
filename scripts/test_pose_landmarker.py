@@ -6,12 +6,18 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
+"""
+- Grønne punkter viser skuldre, albuer og håndledd.
+- Blå linjer viser underarmen.
+- Røde piler viser estimert underarmsretning.
+"""
+
 
 # Paths
 ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = ROOT / "models" / "mediapipe" / "pose_landmarker_lite.task"
-IMAGE_DIR = ROOT / "data" / "exported" / "data"
-OUTPUT_DIR = ROOT / "data" / "results" / "pose_landmarker_test"
+IMAGE_DIR = ROOT / "data/exported/merged/data"
+OUTPUT_DIR = ROOT / "data" / "results" / "pose_landmarker_test_merged1"
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

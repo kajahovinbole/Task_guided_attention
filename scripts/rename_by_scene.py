@@ -10,9 +10,10 @@ from transformers import CLIPModel, CLIPProcessor
 from sklearn.cluster import KMeans
 
 # ---- Innstillinger ----
-INPUT_DIR = Path("data/raw")
-OUTPUT_DIR = Path("data/images_grouped")
-N_SCENES = 2  # Endre hvis du har flere scener
+INPUT_DIR = Path("data/raw/18okt")
+OUTPUT_DIR = Path("data/images_grouped/18okt")
+N_SCENES = 14  # Endre hvis du har flere scener
+START_SCENE_NUMBER = 4  # Startnummer for scene-mapper (scene_04, scene_05, ...)
 
 MODEL_NAME = "openai/clip-vit-base-patch32"
 
@@ -83,7 +84,7 @@ clusters = sorted(
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 records = []
 
-for scene_number, cluster_id in enumerate(clusters, start=1):
+for scene_number, cluster_id in enumerate(clusters, start=START_SCENE_NUMBER):
     members = [
         files[i]
         for i in range(len(files))

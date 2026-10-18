@@ -2,7 +2,7 @@
 from pathlib import Path
 import fiftyone as fo
 
-IMAGE_DIR = Path("data/images_grouped")
+IMAGE_DIR = Path("data/images_grouped/18okt")
 
 # Finn bilder rekursivt
 image_paths = sorted(
@@ -14,7 +14,7 @@ image_paths = sorted(
 if not image_paths:
     raise ValueError(f"Fant ingen bilder i {IMAGE_DIR.resolve()}")
 
-dataset = fo.Dataset("pointing_poc_1")
+dataset = fo.Dataset("pointing_poc_2")
 
 for path in image_paths:
     sample = fo.Sample(filepath=str(path.resolve()))

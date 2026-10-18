@@ -3,10 +3,10 @@ import fiftyone as fo
 import fiftyone.types as fot
 
 # Last inn datasettet fra FiftyOne
-dataset = fo.load_dataset("pointing_poc_1")
+dataset = fo.load_dataset("pointing_poc_2")
 
 # Mappe der eksporten skal lagres
-export_dir = Path("data/exported")
+export_dir = Path("data/exported/18okt")
 export_dir.mkdir(parents=True, exist_ok=True)
 
 # Eksporter bilder og bounding boxes
