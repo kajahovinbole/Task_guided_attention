@@ -5,13 +5,13 @@ import cv2
 from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parent.parent
-IMAGE_DIR = ROOT / "data" / "exported" / "data"
+IMAGE_DIR = ROOT / "data/exported/merged/data/"
 
 MODEL_DIR = ROOT / "models" / "hand_detector" / "yolo_v4_tiny_cross_hands"
 CFG_PATH = MODEL_DIR / "cross-hands-yolov4-tiny.cfg"
 WEIGHTS_PATH = MODEL_DIR / "cross-hands-yolov4-tiny.weights"
 
-OUTPUT_DIR = ROOT / "data" / "yolo_detector" / "hand_detector_test_16okt" / "test_1"
+OUTPUT_DIR = ROOT / "data" / "yolo_detector" / "hand_detector_test_16okt" / "test_2"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 if not CFG_PATH.exists() or not WEIGHTS_PATH.exists():
@@ -31,9 +31,7 @@ output_layer_names = net.getUnconnectedOutLayersNames()
 
 # Test images: change these filenames if they differ in your folder
 test_images = [
-    "scene_02_img_009.jpg",
-    "scene_03_img_004.jpeg",
-    "scene_01_img_010.jpg",
+    img for img in IMAGE_DIR.iterdir() if img.is_file() and img.suffix.lower() in {".jpg", ".jpeg", ".png"}
 ]
 
 for filename in test_images:
