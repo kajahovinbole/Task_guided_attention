@@ -9,6 +9,7 @@ checkpoints/
 *.pt
 *.pth
 *.tar.gz
+.DS_Store
 
 # Jupyter-mellomlagring
 .ipynb_checkpoints/
