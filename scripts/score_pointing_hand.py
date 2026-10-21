@@ -20,7 +20,7 @@ DATA_PATH = Path("data/results/mediapipe_wrist_hand/hand_landmarks.json")
 IMAGE_DIR = Path("data/exported/merged/data/")
 OUTPUT_DIR = Path("data/results/pointing_hand_scores/")
 
-THRESHOLD = 0.65
+THRESHOLD = 0.6
 
 FINGERS = {
     "thumb": [1, 2, 3, 4],
@@ -89,9 +89,9 @@ def score_pointing_hand(hand):
         )
 
     score = (
-        0.50 * index_score
-        + 0.30 * curled_score
-        + 0.20 * extension_score
+        0.60 * index_score
+        + 0.25 * curled_score
+        + 0.15 * extension_score
     )
 
     return {

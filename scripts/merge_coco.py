@@ -7,11 +7,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Endre disse stiene hvis eksportene dine ligger et annet sted.
 EXPORTS = [
-    ROOT / "data/exported/export1",
-    ROOT / "data/exported/export2",
+    ROOT / "data/exported/1_2_andrea_merged",
+    ROOT / "data/exported/export3/data_renamed_by_scene",
 ]
 
-OUTPUT = ROOT / "data/exported/merged"
+OUTPUT = ROOT / "data/exported/1_2_3_andrea_merged"
 
 def main():
     output_images = OUTPUT / "data"

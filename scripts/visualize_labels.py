@@ -5,10 +5,10 @@ from pathlib import Path
 import cv2
 
 # Paths
-EXPORT_DIR = Path("data/exported/merged")
+EXPORT_DIR = Path("data/exported/1_2_3_andrea_merged")
 LABELS_PATH = EXPORT_DIR / "labels.json"
 IMAGE_DIR = EXPORT_DIR / "data"
-OUTPUT_DIR = Path("data/exported/verified_bbox_merged_1")
+OUTPUT_DIR = Path("data/exported/1_2_3_andrea_merged/verified_bbox")
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

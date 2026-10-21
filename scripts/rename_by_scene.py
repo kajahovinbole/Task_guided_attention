@@ -10,10 +10,10 @@ from transformers import CLIPModel, CLIPProcessor
 from sklearn.cluster import KMeans
 
 # ---- Innstillinger ----
-INPUT_DIR = Path("data/raw/18okt")
-OUTPUT_DIR = Path("data/images_grouped/18okt")
-N_SCENES = 14  # Endre hvis du har flere scener
-START_SCENE_NUMBER = 4  # Startnummer for scene-mapper (scene_04, scene_05, ...)
+INPUT_DIR = Path("data/exported/export3/data")
+OUTPUT_DIR = Path("data/exported/export3/data_renamed_by_scene")
+N_SCENES = 11  # Endre hvis du har flere scener
+START_SCENE_NUMBER = 18  # Startnummer for scene-mapper (scene_04, scene_05, ...)
 
 MODEL_NAME = "openai/clip-vit-base-patch32"
 
@@ -95,8 +95,10 @@ for scene_number, cluster_id in enumerate(clusters, start=START_SCENE_NUMBER):
 
     for image_number, source in enumerate(members, start=1):
         new_name = (
-            f"scene_{scene_number:02d}_img_{image_number:03d}.jpg"
+            f"scene_{scene_number:02d}_img_{image_number:03d}"
+            f"{source.suffix.lower()}"
         )
+
         destination = OUTPUT_DIR / new_name
 
         # Kopier filen; originalen endres ikke
@@ -105,6 +107,8 @@ for scene_number, cluster_id in enumerate(clusters, start=START_SCENE_NUMBER):
         records.append({
             "old_filename": source.name,
             "new_filename": new_name,
+            "old_filepath": str(source.resolve()),
+            "new_filepath": str(destination.resolve()),
             "scene": scene_number,
         })
 
