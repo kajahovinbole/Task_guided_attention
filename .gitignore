@@ -11,5 +11,8 @@ checkpoints/
 *.tar.gz
 .DS_Store
 
+# Resultater
+results/
+
 # Jupyter-mellomlagring
 .ipynb_checkpoints/
