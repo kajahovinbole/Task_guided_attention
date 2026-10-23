@@ -11,15 +11,15 @@ import mediapipe as mp
 # Paths and settings
 # --------------------------------------------------
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 
-IMAGE_DIR = ROOT / "data/exported/1_2_3_andrea_merged/data"
+IMAGE_DIR = ROOT / "data/3_exported_from_fiftyone/1_2_3_andrea_merged/data"
 
-MODEL_DIR = ROOT / "models" / "mediapipe"
+MODEL_DIR = ROOT / "models/mediapipe"
 POSE_MODEL = MODEL_DIR / "pose_landmarker_lite.task"
 HAND_MODEL = MODEL_DIR / "hand_landmarker.task"
 
-OUTPUT_DIR = ROOT / "data" / "results" / "wrist_crops/1_2_3_andrea_merged"
+OUTPUT_DIR = ROOT / "results/wrist_detect&handlandmarks"
 CROP_DIR = OUTPUT_DIR / "crops"
 VIS_DIR = OUTPUT_DIR / "visualizations"
 JSON_PATH = OUTPUT_DIR / "hand_landmarks.json"
@@ -27,14 +27,16 @@ JSON_PATH = OUTPUT_DIR / "hand_landmarks.json"
 CROP_DIR.mkdir(parents=True, exist_ok=True)
 VIS_DIR.mkdir(parents=True, exist_ok=True)
 
+
+
 MIN_WRIST_VISIBILITY = 0.3
-MIN_ARM_VISIBILITY = 0.3
-MAX_IMAGE_WIDTH = 1280
+MIN_ARM_VISIBILITY = 0.05
+MAX_IMAGE_WIDTH = 2560
 
 # Crop size = upper-arm length * this factor.
 CROP_SCALE = 2.5
 MIN_CROP_SIZE = 160
-MAX_CROP_SIZE = 800
+MAX_CROP_SIZE = 500
 
 # Extension beyond the fingertip, in original-image pixels.
 ARROW_EXTENSION = 350
