@@ -10,5 +10,8 @@ checkpoints/
 *.pth
 *.tar.gz
 
+# Resultater
+results/
+
 # Jupyter-mellomlagring
 .ipynb_checkpoints/
