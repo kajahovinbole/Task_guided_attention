@@ -13,13 +13,13 @@ import mediapipe as mp
 
 ROOT = Path(__file__).resolve().parent.parent
 
-IMAGE_DIR = ROOT / "data" / "exported" / "merged" / "data"
+IMAGE_DIR = ROOT / "data/exported/1_2_3_andrea_merged/data"
 
 MODEL_DIR = ROOT / "models" / "mediapipe"
 POSE_MODEL = MODEL_DIR / "pose_landmarker_lite.task"
 HAND_MODEL = MODEL_DIR / "hand_landmarker.task"
 
-OUTPUT_DIR = ROOT / "data" / "results" / "mediapipe_wrist_hand"
+OUTPUT_DIR = ROOT / "data" / "results" / "wrist_crops/1_2_3_andrea_merged"
 CROP_DIR = OUTPUT_DIR / "crops"
 VIS_DIR = OUTPUT_DIR / "visualizations"
 JSON_PATH = OUTPUT_DIR / "hand_landmarks.json"
