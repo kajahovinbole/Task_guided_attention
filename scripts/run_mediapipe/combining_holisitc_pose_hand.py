@@ -30,7 +30,7 @@ MODEL_DIR = ROOT / "models/mediapipe"
 HOLISTIC_PATH = MODEL_DIR / "holistic_landmarker.task"
 HAND_PATH = MODEL_DIR / "hand_landmarker.task"
 
-OUTPUT_DIR = ROOT / "results/combined_holistic_pose_hand/tom_scene28"
+OUTPUT_DIR = ROOT / "results/combined_holistic_pose_hand/tom_scene28_2"
 VIS_DIR = OUTPUT_DIR / "visualizations"
 CROP_DIR = OUTPUT_DIR / "fallback_crops"
 
@@ -63,9 +63,9 @@ holistic_options = Vision.HolisticLandmarkerOptions(
         model_asset_path=str(HOLISTIC_PATH)
     ),
     running_mode=Vision.RunningMode.IMAGE,
-    min_pose_detection_confidence=0.5,
-    min_pose_landmarks_confidence=0.5,
-    min_hand_landmarks_confidence=0.5,
+    min_pose_detection_confidence=0.3,
+    min_pose_landmarks_confidence=0.3,
+    min_hand_landmarks_confidence=0.3,
 )
 
 hand_options = Vision.HandLandmarkerOptions(
