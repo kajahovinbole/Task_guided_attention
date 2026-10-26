@@ -27,13 +27,13 @@ JSON_PATH = OUTPUT_DIR / "hand_landmarks.json"
 CROP_DIR.mkdir(parents=True, exist_ok=True)
 VIS_DIR.mkdir(parents=True, exist_ok=True)
 
-MIN_WRIST_VISIBILITY = 0.3
+MIN_WRIST_VISIBILITY = 0.1
 MIN_ARM_VISIBILITY = 0.1
 MAX_IMAGE_WIDTH = 2560
 
 CROP_SCALE = 3.0
-MIN_CROP_SIZE = 200
-MAX_CROP_SIZE = 800
+MIN_CROP_SIZE = 300
+MAX_CROP_SIZE = 1000
 
 ARROW_EXTENSION = 350
 
@@ -504,6 +504,11 @@ total_wrist_candidates = 0
 total_direct_candidates = 0
 images_processed = 0
 
+images_no_hands = 0
+images_with_hands = 0
+images_left_without_hand = 0
+images_right_without_hand = 0
+
 try:
     for image_path in image_paths:
         original = cv2.imread(str(image_path))
@@ -679,6 +684,12 @@ try:
 
         accepted_hands = deduplicate_candidates(candidates)
 
+        # Count images with and without detected hands
+        if len(accepted_hands) == 0:
+            images_no_hands += 1
+        else:
+            images_with_hands += 1
+
         for hand_number, candidate in enumerate(
             accepted_hands, start=1
         ):
@@ -731,6 +742,13 @@ with open(JSON_PATH, "w", encoding="utf-8") as f:
 
 print("\nFerdig.")
 print(f"Bilder behandlet: {images_processed}")
+print(f"Bilder med minst én hånd funnet: {images_with_hands}")
+print(f"Bilder uten noen hender funnet: {images_no_hands}")
+
+if images_processed > 0:
+    percentage = 100 * images_no_hands / images_processed
+    print(f"Andel bilder uten hender: {percentage:.1f}%")
+
 print(f"Kandidater fra fullbilder: {total_direct_candidates}")
 print(f"Kandidater fra wrist-crops: {total_wrist_candidates}")
 print(f"Hender etter deduplisering: {total_hands}")
