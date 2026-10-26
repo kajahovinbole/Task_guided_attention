@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
 
 from models.AbSViT.absvit import absvit_tiny_patch8_224_gap
 #from models.AbSViT.absvit import absvit_tiny_patch16_224
-from scripts.create_numeric_prior import create_cone_heatmap
+from scripts.prior.create_numeric_prior import create_cone_heatmap
 
 
 # --------------------------------------------------
