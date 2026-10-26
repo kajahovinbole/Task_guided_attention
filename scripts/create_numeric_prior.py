@@ -2,8 +2,6 @@ import json
 from pathlib import Path
 
 import numpy as np
-import torch
-import torch.nn.functional as F
 
 
 JSON_PATH = Path(
@@ -11,15 +9,16 @@ JSON_PATH = Path(
 )
 
 OUTPUT_DIR = Path("data/results/numeric_pointing_prior")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-IMAGE_SIZE = 224
-PATCH_SIZE = 16
 
 CONE_LENGTH = 0.60
 CONE_WIDTH = 0.015
 CONE_WIDENING = 0.12
-CONE_DECAY = 0.50
+
+# Kjeglen er like sterk langs hele midtlinjen (ingen avtakende styrke
+# utover). Nærmest fingertuppen trappes den opp lineært fra 0 til 1 over
+# denne avstanden (andel av diagonalen), siden man sjelden peker på noe
+# rett foran hånden. Sett til 0 for full styrke helt fra fingertuppen.
+CONE_NEAR_RAMP = 0.05
 
 
 def create_cone_heatmap(tip, direction, width, height):
@@ -40,7 +39,11 @@ def create_cone_heatmap(tip, direction, width, height):
 
     sigma = sigma_start + CONE_WIDENING * np.maximum(t, 0)
     lateral = np.exp(-0.5 * (r / sigma) ** 2)
-    longitudinal = np.exp(-t / (CONE_DECAY * cone_length))
+    near_ramp = CONE_NEAR_RAMP * diagonal
+    if near_ramp > 0:
+        longitudinal = np.clip(t / near_ramp, 0, 1)
+    else:
+        longitudinal = np.ones_like(t, dtype=np.float64)
 
     valid = (t > 0) & (t < cone_length)
     heatmap = (lateral * longitudinal * valid).astype(np.float32)
@@ -76,8 +79,8 @@ def get_pointing_data(hand):
 
 
 def main():
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     data = json.loads(JSON_PATH.read_text())
-    patch_grid_size = IMAGE_SIZE // PATCH_SIZE
 
     for entry in data:
         image_name = Path(entry["image"]).stem
@@ -88,37 +91,17 @@ def main():
                 continue
 
             tip, direction = pointing
-
-            # Heatmap beregnes direkte på modellens inputoppløsning.
-            heatmap = create_cone_heatmap(
-                tip, direction, IMAGE_SIZE, IMAGE_SIZE
-            )
-
-            # [1, 1, H, W] for PyTorch-resampling.
-            tensor = torch.from_numpy(heatmap)[None, None]
-
-            # Gjennomsnittlig prior per patch.
-            patch_prior = F.avg_pool2d(
-                tensor,
-                kernel_size=PATCH_SIZE,
-                stride=PATCH_SIZE,
-            )[0, 0]
-
-            assert patch_prior.shape == (
-                patch_grid_size, patch_grid_size
-            )
-
             output_name = f"{image_name}_hand_{hand_index}"
 
+            # Bare pekingen lagres. Kjeglen lages i test_absvit_prior.py,
+            # med riktig sideforhold og rutenett for modellen som brukes.
             np.savez_compressed(
                 OUTPUT_DIR / f"{output_name}.npz",
-                heatmap_224=heatmap,
-                patch_prior=patch_prior.numpy(),
                 tip=np.asarray(tip, dtype=np.float32),
                 direction=np.asarray(direction, dtype=np.float32),
             )
 
-    print(f"Numeriske priorer lagret i {OUTPUT_DIR}")
+    print(f"Pekedata lagret i {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

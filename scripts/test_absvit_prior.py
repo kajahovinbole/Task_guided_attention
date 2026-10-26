@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from models.AbSViT.absvit import absvit_tiny_patch16_224
+from models.AbSViT.absvit import absvit_tiny_patch8_224_gap
+#from models.AbSViT.absvit import absvit_tiny_patch16_224
 from scripts.create_numeric_prior import create_cone_heatmap
 
 
@@ -28,15 +29,17 @@ from scripts.create_numeric_prior import create_cone_heatmap
 DATA_DIR = ROOT / "data" / "funker_bra_20okt"
 IMAGE_DIR = DATA_DIR / "imgs"
 PRIOR_DIR = DATA_DIR / "numeric_prior"
-CHECKPOINT = ROOT / "checkpoints" / "absvit_tiny.pth"
-OUTPUT_DIR = ROOT / "data" / "results" / "absvit_prior_test"
+CHECKPOINT = ROOT / "checkpoints" / "absvit_tiny_patch8_224_gap.pth"#"absvit_tiny.pth"
+OUTPUT_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9" #"absvit_prior_test"
+# Kartene lagres her slik at evaluate_bbox.py kan bruke dem.
+MAPS_DIR = OUTPUT_DIR / "maps"
 
 IMAGE_SIZE = 224
-PATCH_SIZE = 16
+PATCH_SIZE = 8
 
 # Valgt fra tidligere sveip. Bør senere valideres mot objektlokalisering,
 # ikke bare andelen token-norm inne i den geometriske kjeglen.
-PRIOR_SCALE = 5.0
+PRIOR_SCALE = 40.0
 CLS_PRIOR = 0.0
 
 # Antall lag fra slutten til laget hvor token-normen visualiseres.
@@ -124,8 +127,10 @@ def find_image(stem):
 
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    MAPS_DIR.mkdir(parents=True, exist_ok=True)
 
-    model = absvit_tiny_patch16_224(pretrained=False)
+    #model = absvit_tiny_patch16_224(pretrained=False)
+    model = absvit_tiny_patch8_224_gap(pretrained=False)
     checkpoint = torch.load(CHECKPOINT, map_location="cpu", weights_only=False)
     model.load_state_dict(checkpoint.get("model", checkpoint))
     model.eval()
@@ -168,6 +173,17 @@ def main():
             f"{pointing_fraction:>9.2f}"
         )
 
+        np.savez_compressed(
+            MAPS_DIR / f"{stem}.npz",
+            image_name=image_path.name,
+            image_w=image_w,
+            image_h=image_h,
+            heatmap_224=heatmap.numpy(),
+            patch_prior=patch_prior.numpy(),
+            baseline_map=baseline_map.numpy(),
+            pointing_map=pointing_map.numpy(),
+        )
+
         fig, axes = plt.subplots(1, 3, figsize=(14, 5))
         axes[0].imshow(rgb)
         axes[0].imshow(heatmap.numpy(), cmap="jet", alpha=0.4)
@@ -181,13 +197,15 @@ def main():
         shared_min = min(float(baseline_map.min()), float(pointing_map.min()))
         shared_max = max(float(baseline_map.max()), float(pointing_map.max()))
         for ax, (name, token_map, fraction) in zip(axes[1:], results):
+            # Bottom-up får egen skala, peking beholder felles skala.
+            vmin, vmax = (None, None) if name.startswith("Bottom-up") else (shared_min, shared_max)
             ax.imshow(rgb)
             ax.imshow(
                 token_map.numpy(), cmap="viridis", alpha=0.6,
                 extent=(0, IMAGE_SIZE, IMAGE_SIZE, 0),
-                interpolation="nearest", vmin=shared_min, vmax=shared_max,
+                interpolation="nearest", vmin=vmin, vmax=vmax,
             )
-            ax.set_title(f"{name}\nAndel i kjegle: {fraction:.2f}")
+            ax.set_title(f"{name}\nFraction in cone: {fraction:.2f}")
 
         for ax in axes:
             ax.set_xticks([])
