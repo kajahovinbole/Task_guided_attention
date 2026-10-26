@@ -10,7 +10,6 @@ checkpoints/
 *.pth
 *.tar.gz
 .DS_Store
-
 # Resultater
 results/
 
