@@ -27,10 +27,17 @@ class PipelineConfig:
     hand_agreement_threshold: float = 0.08
 
     # YOLO detections and object-selection signal weights
-    yolo_inference_confidence: float = 0.05
+    yolo_inference_confidence: float = 0.3
     min_yolo_confidence: float = 0.25
     saliency_weight: float = 0.80
     yolo_confidence_weight: float = 0.20
+    score_smoothing_alpha: float = 0.35
+    bbox_smoothing_alpha: float = 0.45
+    track_switch_margin: float = 0.08
+    switch_confirmation_frames: int = 4
+    track_match_iou_threshold: float = 0.20
+    track_max_missing_frames: int = 5
+    selected_missing_grace_frames: int = 3
 
     # Cone prior geometry; distances are fractions of the frame diagonal
     cone_length: float = 0.60
@@ -57,6 +64,23 @@ class PipelineConfig:
             raise ValueError("Signalvektene kan ikke være negative.")
         if self.saliency_weight + self.yolo_confidence_weight <= 0:
             raise ValueError("Minst én signalvekt må være større enn null.")
+        if not 0.0 < self.score_smoothing_alpha <= 1.0:
+            raise ValueError("score_smoothing_alpha må være større enn 0 og maks 1.")
+        if not 0.0 < self.bbox_smoothing_alpha <= 1.0:
+            raise ValueError("bbox_smoothing_alpha må være større enn 0 og maks 1.")
+        if not 0.0 <= self.track_switch_margin <= 1.0:
+            raise ValueError("track_switch_margin må være mellom 0 og 1.")
+        if not 0.0 <= self.track_match_iou_threshold <= 1.0:
+            raise ValueError("track_match_iou_threshold må være mellom 0 og 1.")
+        if self.switch_confirmation_frames <= 0:
+            raise ValueError("switch_confirmation_frames må være positiv.")
+        if self.track_max_missing_frames < 0:
+            raise ValueError("track_max_missing_frames kan ikke være negativ.")
+        if not 0 <= self.selected_missing_grace_frames <= self.track_max_missing_frames:
+            raise ValueError(
+                "selected_missing_grace_frames må være mellom 0 og "
+                "track_max_missing_frames."
+            )
         if not 0.0 <= self.heatmap_opacity <= 1.0:
             raise ValueError("heatmap_opacity må være mellom 0 og 1.")
         if self.yolo_image_size <= 0 or self.hand_crop_size <= 0:

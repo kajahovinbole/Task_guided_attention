@@ -55,7 +55,9 @@ uv run python main.py path/to/video.mp4 --show
 
 For a camera, pass its index, usually `0`. The patch-8 GAP checkpoint must be present at `checkpoints/absvit_tiny_patch8_224_gap.pth`; Ultralytics loads `yolo26n.pt` by default.
 
-Tune the pipeline in one place: `configs/full_pipeline.py`. It contains the model and device, YOLO inference size and confidence thresholds, pointing-hand and MediaPipe thresholds, cone geometry, AbSViT prior strength and focus layer, signal weights, output defaults, and heatmap opacity. By default, object choice combines normalized AbSViT saliency and YOLO confidence with weights `0.80` and `0.20`. Eligible boxes must also pass `min_yolo_confidence`; `yolo_inference_confidence` controls which lower-confidence boxes YOLO returns for verification.
+Tune the pipeline in one place: `configs/full_pipeline.py`. It contains the model and device, YOLO inference size and confidence thresholds, pointing-hand and MediaPipe thresholds, cone geometry, AbSViT prior strength and focus layer, signal weights, temporal smoothing and switching, output defaults, and heatmap opacity. By default, object choice combines normalized AbSViT saliency and YOLO confidence with weights `0.80` and `0.20`. Eligible boxes must also pass `min_yolo_confidence`; `yolo_inference_confidence` controls which lower-confidence boxes YOLO returns for verification.
+
+YOLO detections are associated across frames by class and IoU. Each track gets a smoothed score and bbox; a new object must beat the current one by `track_switch_margin` for `switch_confirmation_frames` before the selection changes. The selected bbox is held briefly through detector dropouts. Adjust `score_smoothing_alpha` and `bbox_smoothing_alpha` to trade smoothness for responsiveness.
 
 The default output folder is `results/video_pipeline/<video-name>/` and contains:
 

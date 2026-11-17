@@ -26,6 +26,7 @@ from scripts.prior.score_pointing_hand import (
 )
 from scripts.yolo_detection import detect_objects, load_yolo_model
 from configs.full_pipeline import DEFAULT_CONFIG, PipelineConfig
+from src.temporal_object_selector import TemporalObjectSelector
 from src.video_hand_detector import VideoHandDetector
 
 
@@ -136,7 +137,7 @@ def score_box_with_saliency(saliency, box):
     return float(saliency[y1:y2, x1:x2].mean())
 
 
-def choose_detection(
+def score_detections(
     detections,
     min_confidence,
     saliency,
@@ -144,7 +145,6 @@ def choose_detection(
     saliency_weight,
     confidence_weight,
 ):
-    eligible = []
     weight_total = saliency_weight + confidence_weight
     for detection in detections:
         detection["saliency_score"] = score_box_with_saliency(
@@ -160,18 +160,6 @@ def choose_detection(
             saliency_weight * detection["saliency_score"]
             + confidence_weight * detection["confidence"]
         ) / weight_total if detection["saliency_score"] is not None else None
-        if detection["eligible"]:
-            eligible.append(detection)
-
-    if not eligible:
-        return None
-
-    selected = max(
-        eligible,
-        key=lambda item: item["selection_score"],
-    )
-    selected["selected"] = True
-    return selected
 
 
 def draw_hand_landmarks(image, hands, selected_side):
@@ -204,25 +192,39 @@ def draw_selected_view(frame, selected):
     output = frame.copy()
     if selected is None:
         return output
-    x1, y1, x2, y2 = map(int, selected["bbox_xyxy"])
-    cv2.rectangle(output, (x1, y1), (x2, y2), (0, 220, 0), 3)
-    label = f"{selected['class_name']} {selected['confidence']:.2f}"
+    box = selected.get("smoothed_bbox_xyxy", selected["bbox_xyxy"])
+    x1, y1, x2, y2 = map(int, box)
+    color = (0, 220, 255) if selected.get("tracked_missing") else (0, 220, 0)
+    cv2.rectangle(output, (x1, y1), (x2, y2), color, 3)
+    suffix = " held" if selected.get("tracked_missing") else ""
+    label = f"{selected['class_name']} {selected['confidence']:.2f}{suffix}"
     cv2.putText(
         output, label, (x1, max(22, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX,
-        0.7, (0, 220, 0), 2, cv2.LINE_AA,
+        0.7, color, 2, cv2.LINE_AA,
     )
     return output
 
 
 def draw_verification_view(
-    frame, detections, hands, selected_hand, focus_map, focus_mode, config
+    frame,
+    detections,
+    hands,
+    selected_hand,
+    selected_detection,
+    focus_map,
+    focus_mode,
+    config,
 ):
     output = draw_saliency_overlay(
         frame.copy(), focus_map, config.heatmap_opacity
     )
     draw_hand_landmarks(output, hands, selected_hand)
     for detection in detections:
-        x1, y1, x2, y2 = map(int, detection["bbox_xyxy"])
+        box = (
+            detection.get("smoothed_bbox_xyxy", detection["bbox_xyxy"])
+            if detection["selected"] else detection["bbox_xyxy"]
+        )
+        x1, y1, x2, y2 = map(int, box)
         color = (0, 220, 0) if detection["selected"] else (0, 0, 255)
         focus = detection["saliency_score"]
         focus_text = "n/a" if focus is None else f"{focus:.2f}"
@@ -244,6 +246,23 @@ def draw_verification_view(
         cv2.putText(
             output, "NO POINTING HAND", (20, 35), cv2.FONT_HERSHEY_SIMPLEX,
             0.8, (0, 0, 255), 2, cv2.LINE_AA,
+        )
+    if selected_detection is not None and selected_detection.get("tracked_missing"):
+        x1, y1, x2, y2 = map(
+            int, selected_detection.get(
+                "smoothed_bbox_xyxy", selected_detection["bbox_xyxy"]
+            )
+        )
+        cv2.rectangle(output, (x1, y1), (x2, y2), (0, 220, 255), 3)
+        cv2.putText(
+            output,
+            f"{selected_detection['class_name']} held",
+            (x1, max(20, y1 - 6)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (0, 220, 255),
+            2,
+            cv2.LINE_AA,
         )
     cv2.putText(
         output,
@@ -302,6 +321,15 @@ def run_full_pipeline(
         crop_size=config.hand_crop_size,
         agreement_threshold=config.hand_agreement_threshold,
         min_detection_confidence=config.hand_detection_confidence,
+    )
+    object_selector = TemporalObjectSelector(
+        score_alpha=config.score_smoothing_alpha,
+        bbox_alpha=config.bbox_smoothing_alpha,
+        switch_margin=config.track_switch_margin,
+        switch_confirmation_frames=config.switch_confirmation_frames,
+        match_iou_threshold=config.track_match_iou_threshold,
+        max_missing_frames=config.track_max_missing_frames,
+        selected_missing_grace_frames=config.selected_missing_grace_frames,
     )
 
     capture = cv2.VideoCapture(source)
@@ -374,13 +402,17 @@ def run_full_pipeline(
                     config.yolo_inference_confidence,
                     image_size=config.yolo_image_size,
                 )
-                selected = choose_detection(
+                score_detections(
                     detections,
                     config.min_yolo_confidence,
                     focus_map,
                     pointing_available=focus_mode == "pointing_prior",
                     saliency_weight=config.saliency_weight,
                     confidence_weight=config.yolo_confidence_weight,
+                )
+                selected = object_selector.select(
+                    detections,
+                    pointing_available=focus_mode == "pointing_prior",
                 )
 
                 selected_view = draw_selected_view(frame, selected)
@@ -389,6 +421,7 @@ def run_full_pipeline(
                     detections,
                     hands,
                     pointing_hand["side"] if pointing_hand else None,
+                    selected,
                     focus_map,
                     focus_mode,
                     config,
@@ -409,6 +442,12 @@ def run_full_pipeline(
                         if pointing_hand else None
                     ),
                     "focus_mode": focus_mode,
+                    "selected_track_id": (
+                        selected["track_id"] if selected else None
+                    ),
+                    "selected_tracked_missing": bool(
+                        selected and selected.get("tracked_missing")
+                    ),
                     "hands": [
                         {
                             "side": hand["side"],
@@ -420,7 +459,8 @@ def run_full_pipeline(
                     ],
                     "detections": detections,
                     "selected_detection_index": (
-                        selected["index"] if selected else None
+                        selected["index"]
+                        if selected and not selected.get("tracked_missing") else None
                     ),
                 }
                 records_file.write(json.dumps(record, ensure_ascii=False) + "\n")
