@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 import time
 
@@ -11,6 +12,7 @@ import numpy as np
 import torch
 
 from scripts.absvit_prior import (
+    get_token_norm_map,
     load_abs_vit_model,
     make_patch_prior,
     preprocess_rgb,
@@ -20,10 +22,10 @@ from scripts.absvit_prior import (
 from scripts.prior.create_numeric_prior import get_pointing_data
 from scripts.prior.score_pointing_hand import (
     HAND_CONNECTIONS,
-    THRESHOLD,
     score_pointing_hand,
 )
 from scripts.yolo_detection import detect_objects, load_yolo_model
+from configs.full_pipeline import DEFAULT_CONFIG, PipelineConfig
 from src.video_hand_detector import VideoHandDetector
 
 
@@ -59,27 +61,57 @@ def normalize_saliency(token_map):
     return ((values - minimum) / (maximum - minimum)).astype(np.float32)
 
 
-def create_saliency_map(model, frame_bgr, pointing_hand, device):
+def create_focus_map(model, frame_bgr, pointing_hand, device, config):
+    """Create prior-conditioned focus, or bottom-up focus if no hand points."""
     height, width = frame_bgr.shape[:2]
-    hand_data = {"final_landmarks": pointing_hand["landmarks"]}
-    pointing = get_pointing_data(hand_data, width, height)
-    if pointing is None:
-        return None
-
-    tip, direction = pointing
-    _, patch_prior = make_patch_prior(tip, direction, width, height)
-    pointing_mask = prior_to_mask(
-        patch_prior, model.num_prefix_tokens
-    ).to(device)
     image_tensor = prepare_frame_tensor(frame_bgr, device)
-
     with torch.no_grad():
-        features, _, _ = model.forward_features(image_tensor)
-        token_map = run_pointing(
-            model, image_tensor, features, pointing_mask
-        )
+        if pointing_hand is None:
+            token_map = get_token_norm_map(
+                model,
+                image_tensor,
+                attention_layer_from_end=config.attention_layer_from_end,
+            )
+            mode = "bottom_up"
+        else:
+            hand_data = {"final_landmarks": pointing_hand["landmarks"]}
+            pointing = get_pointing_data(hand_data, width, height)
+            if pointing is None:
+                token_map = get_token_norm_map(
+                    model,
+                    image_tensor,
+                    attention_layer_from_end=config.attention_layer_from_end,
+                )
+                mode = "bottom_up"
+            else:
+                tip, direction = pointing
+                _, patch_prior = make_patch_prior(
+                    tip,
+                    direction,
+                    width,
+                    height,
+                    cone_length=config.cone_length,
+                    cone_width=config.cone_width,
+                    cone_widening=config.cone_widening,
+                    cone_near_ramp=config.cone_near_ramp,
+                )
+                pointing_mask = prior_to_mask(
+                    patch_prior,
+                    model.num_prefix_tokens,
+                    prior_scale=config.prior_scale,
+                    cls_prior=config.cls_prior,
+                ).to(device)
+                features, _, _ = model.forward_features(image_tensor)
+                token_map = run_pointing(
+                    model,
+                    image_tensor,
+                    features,
+                    pointing_mask,
+                    attention_layer_from_end=config.attention_layer_from_end,
+                )
+                mode = "pointing_prior"
 
-    return normalize_saliency(token_map)
+    return normalize_saliency(token_map), mode
 
 
 def resize_saliency(saliency, frame_shape):
@@ -104,8 +136,16 @@ def score_box_with_saliency(saliency, box):
     return float(saliency[y1:y2, x1:x2].mean())
 
 
-def choose_detection(detections, min_confidence, saliency):
+def choose_detection(
+    detections,
+    min_confidence,
+    saliency,
+    pointing_available,
+    saliency_weight,
+    confidence_weight,
+):
     eligible = []
+    weight_total = saliency_weight + confidence_weight
     for detection in detections:
         detection["saliency_score"] = score_box_with_saliency(
             saliency, detection["bbox_xyxy"]
@@ -113,18 +153,22 @@ def choose_detection(detections, min_confidence, saliency):
         detection["eligible"] = (
             detection["confidence"] >= min_confidence
             and detection["saliency_score"] is not None
+            and pointing_available
         )
         detection["selected"] = False
+        detection["selection_score"] = (
+            saliency_weight * detection["saliency_score"]
+            + confidence_weight * detection["confidence"]
+        ) / weight_total if detection["saliency_score"] is not None else None
         if detection["eligible"]:
             eligible.append(detection)
 
     if not eligible:
         return None
 
-    # Saliency ranks candidates; YOLO confidence breaks exact ties.
     selected = max(
         eligible,
-        key=lambda item: (item["saliency_score"], item["confidence"]),
+        key=lambda item: item["selection_score"],
     )
     selected["selected"] = True
     return selected
@@ -146,14 +190,14 @@ def draw_hand_landmarks(image, hands, selected_side):
                 cv2.circle(image, (x, y), 3, color, -1)
 
 
-def draw_saliency_overlay(image, saliency):
+def draw_saliency_overlay(image, saliency, opacity):
     if saliency is None:
         return image
     colored = cv2.applyColorMap(
         np.uint8(np.clip(saliency, 0.0, 1.0) * 255),
         cv2.COLORMAP_JET,
     )
-    return cv2.addWeighted(image, 0.55, colored, 0.45, 0)
+    return cv2.addWeighted(image, 1.0 - opacity, colored, opacity, 0)
 
 
 def draw_selected_view(frame, selected):
@@ -170,8 +214,12 @@ def draw_selected_view(frame, selected):
     return output
 
 
-def draw_verification_view(frame, detections, hands, selected_hand, saliency):
-    output = draw_saliency_overlay(frame.copy(), saliency)
+def draw_verification_view(
+    frame, detections, hands, selected_hand, focus_map, focus_mode, config
+):
+    output = draw_saliency_overlay(
+        frame.copy(), focus_map, config.heatmap_opacity
+    )
     draw_hand_landmarks(output, hands, selected_hand)
     for detection in detections:
         x1, y1, x2, y2 = map(int, detection["bbox_xyxy"])
@@ -180,7 +228,11 @@ def draw_verification_view(frame, detections, hands, selected_hand, saliency):
         focus_text = "n/a" if focus is None else f"{focus:.2f}"
         label = (
             f"{detection['class_name']} conf={detection['confidence']:.2f} "
-            f"focus={focus_text}"
+            f"focus={focus_text} "
+            f"score={detection['selection_score']:.2f}"
+            if detection["selection_score"] is not None else
+            f"{detection['class_name']} conf={detection['confidence']:.2f} "
+            f"focus={focus_text} score=n/a"
         )
         cv2.rectangle(output, (x1, y1), (x2, y2), color, 2)
         cv2.putText(
@@ -193,6 +245,16 @@ def draw_verification_view(frame, detections, hands, selected_hand, saliency):
             output, "NO POINTING HAND", (20, 35), cv2.FONT_HERSHEY_SIMPLEX,
             0.8, (0, 0, 255), 2, cv2.LINE_AA,
         )
+    cv2.putText(
+        output,
+        f"FOCUS MAP: {focus_mode.replace('_', ' ').upper()}",
+        (20, output.shape[0] - 18),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.65,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
     return output
 
 
@@ -217,27 +279,30 @@ def _source_label(source):
 
 def run_full_pipeline(
     source,
+    config: PipelineConfig = DEFAULT_CONFIG,
     output_dir=None,
-    checkpoint_path=None,
-    yolo_model_name="yolo26n.pt",
-    min_pointing_score=THRESHOLD,
-    min_yolo_confidence=0.25,
-    yolo_inference_confidence=0.05,
-    device_name="auto",
-    show=False,
+    show=None,
     max_frames=None,
 ):
-    device = choose_device(device_name)
-    if checkpoint_path is None:
-        checkpoint_path = ROOT / "checkpoints" / "absvit_tiny_patch8_224_gap.pth"
+    config = config or DEFAULT_CONFIG
+    device = choose_device(config.device)
     if output_dir is None:
-        output_dir = ROOT / "results" / "video_pipeline" / _source_label(source)
+        output_dir = config.output_root / _source_label(source)
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    show = config.show_windows if show is None else show
+    max_frames = config.max_frames if max_frames is None else max_frames
+    if max_frames is not None and max_frames <= 0:
+        raise ValueError("max_frames må være større enn null.")
 
-    abs_vit = load_abs_vit_model(checkpoint_path, device)
-    yolo_model = load_yolo_model(yolo_model_name)
-    hand_detector = VideoHandDetector(ROOT / "models" / "mediapipe")
+    abs_vit = load_abs_vit_model(config.checkpoint_path, device)
+    yolo_model = load_yolo_model(config.yolo_model)
+    hand_detector = VideoHandDetector(
+        ROOT / "models" / "mediapipe",
+        crop_size=config.hand_crop_size,
+        agreement_threshold=config.hand_agreement_threshold,
+        min_detection_confidence=config.hand_detection_confidence,
+    )
 
     capture = cv2.VideoCapture(source)
     if not capture.isOpened():
@@ -264,11 +329,12 @@ def run_full_pipeline(
                 "type": "metadata",
                 "source": str(source),
                 "fps": fps,
-                "checkpoint": str(Path(checkpoint_path).resolve()),
-                "yolo_model": yolo_model_name,
-                "min_pointing_score": min_pointing_score,
-                "min_yolo_confidence": min_yolo_confidence,
-                "selection_rule": "highest mean AbSViT saliency inside eligible YOLO boxes; YOLO confidence breaks ties",
+                "checkpoint": str(Path(config.checkpoint_path).resolve()),
+                "config": {
+                    key: str(value) if isinstance(value, Path) else value
+                    for key, value in asdict(config).items()
+                },
+                "selection_rule": "weighted mean of normalized AbSViT saliency and YOLO confidence; pointing hand and YOLO confidence threshold are required",
             }, ensure_ascii=False) + "\n")
 
             while max_frames is None or frame_index < max_frames:
@@ -294,18 +360,27 @@ def run_full_pipeline(
                 last_timestamp_ms = timestamp_ms
 
                 hands = hand_detector.detect(frame, timestamp_ms)
-                pointing_hand = _pointing_hands(hands, min_pointing_score)
-                saliency_small = (
-                    create_saliency_map(abs_vit, frame, pointing_hand, device)
-                    if pointing_hand is not None else None
+                pointing_hand = _pointing_hands(
+                    hands, config.min_pointing_score
                 )
-                saliency = resize_saliency(saliency_small, frame.shape)
+                focus_small, focus_mode = create_focus_map(
+                    abs_vit, frame, pointing_hand, device, config
+                )
+                focus_map = resize_saliency(focus_small, frame.shape)
 
                 detections = detect_objects(
-                    yolo_model, frame, yolo_inference_confidence
+                    yolo_model,
+                    frame,
+                    config.yolo_inference_confidence,
+                    image_size=config.yolo_image_size,
                 )
                 selected = choose_detection(
-                    detections, min_yolo_confidence, saliency
+                    detections,
+                    config.min_yolo_confidence,
+                    focus_map,
+                    pointing_available=focus_mode == "pointing_prior",
+                    saliency_weight=config.saliency_weight,
+                    confidence_weight=config.yolo_confidence_weight,
                 )
 
                 selected_view = draw_selected_view(frame, selected)
@@ -314,7 +389,9 @@ def run_full_pipeline(
                     detections,
                     hands,
                     pointing_hand["side"] if pointing_hand else None,
-                    saliency,
+                    focus_map,
+                    focus_mode,
+                    config,
                 )
                 selected_writer.write(selected_view)
                 verification_writer.write(verification_view)
@@ -331,6 +408,7 @@ def run_full_pipeline(
                         }
                         if pointing_hand else None
                     ),
+                    "focus_mode": focus_mode,
                     "hands": [
                         {
                             "side": hand["side"],

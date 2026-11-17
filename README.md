@@ -45,7 +45,7 @@ Run commands from the repository root. Local datasets and checkpoints must exist
 
 ### Video pipeline
 
-The full pipeline takes a video file (or camera index), finds hands with the combined MediaPipe approach, selects a pointing hand, conditions AbSViT with the cone prior, detects objects with YOLO, and ranks YOLO boxes by their mean AbSViT saliency. YOLO confidence is used as an eligibility threshold and is kept in the per-frame records.
+The full pipeline takes a video file (or camera index), finds hands with the combined MediaPipe approach, selects a pointing hand, conditions AbSViT with the cone prior, detects objects with YOLO, and ranks YOLO boxes using AbSViT focus and YOLO confidence. A focus heatmap is drawn on every frame of the verification video: it is prior-conditioned when a pointing hand is available and bottom-up otherwise. Object selection still requires a valid pointing prior.
 
 The pipeline reuses the pointing-hand score from `scripts/prior/score_pointing_hand.py`, pointing geometry from `scripts/prior/create_numeric_prior.py`, AbSViT preprocessing/prior/model helpers from `scripts/absvit_prior.py`, and YOLO frame inference from `scripts/yolo_detection.py`. This keeps image experiments and video processing on the same implementations where their workflows overlap.
 
@@ -55,13 +55,15 @@ uv run python main.py path/to/video.mp4 --show
 
 For a camera, pass its index, usually `0`. The patch-8 GAP checkpoint must be present at `checkpoints/absvit_tiny_patch8_224_gap.pth`; Ultralytics loads `yolo26n.pt` by default.
 
+Tune the pipeline in one place: `configs/full_pipeline.py`. It contains the model and device, YOLO inference size and confidence thresholds, pointing-hand and MediaPipe thresholds, cone geometry, AbSViT prior strength and focus layer, signal weights, output defaults, and heatmap opacity. By default, object choice combines normalized AbSViT saliency and YOLO confidence with weights `0.80` and `0.20`. Eligible boxes must also pass `min_yolo_confidence`; `yolo_inference_confidence` controls which lower-confidence boxes YOLO returns for verification.
+
 The default output folder is `results/video_pipeline/<video-name>/` and contains:
 
 - `selected_object.mp4`: the selected object bounding box per frame.
-- `verification.mp4`: all YOLO boxes and confidences, selected hand landmarks, and the AbSViT saliency overlay.
+- `verification.mp4`: all YOLO boxes and confidences, selected hand landmarks, and a continuous AbSViT focus heatmap.
 - `frames.jsonl`: one metadata record and one record per processed frame, including hand scores and all object detections.
 
-Use `--max-frames 100` for a short run, `--output-dir PATH` to choose another output folder, and `--device cpu|mps|cuda` to select the AbSViT device. Press `q` to stop the display when running with `--show`.
+Use `--max-frames 100` for a short run or `--output-dir PATH` to choose another output folder. Add `--show` to display both outputs while processing. Device and other tunable model settings are in `configs/full_pipeline.py`.
 
 ### MediaPipe scripts
 

@@ -17,7 +17,13 @@ if str(ROOT) not in sys.path:
 
 from models.AbSViT.absvit import absvit_tiny_patch8_224_gap
 #from models.AbSViT.absvit import absvit_tiny_patch16_224
-from scripts.prior.create_numeric_prior import create_cone_heatmap
+from scripts.prior.create_numeric_prior import (
+    CONE_LENGTH,
+    CONE_NEAR_RAMP,
+    CONE_WIDENING,
+    CONE_WIDTH,
+    create_cone_heatmap,
+)
 
 
 # --------------------------------------------------
@@ -83,11 +89,29 @@ def load_abs_vit_model(checkpoint_path, device="cpu"):
     return model
 
 
-def make_patch_prior(tip, direction, image_w, image_h):
+def make_patch_prior(
+    tip,
+    direction,
+    image_w,
+    image_h,
+    cone_length=CONE_LENGTH,
+    cone_width=CONE_WIDTH,
+    cone_widening=CONE_WIDENING,
+    cone_near_ramp=CONE_NEAR_RAMP,
+):
     """Lag pekekjegle med originalt sideforhold, resample til ViT-grid."""
     small_w = 448
     small_h = round(small_w * image_h / image_w)
-    heatmap = create_cone_heatmap(tip, direction, small_w, small_h)
+    heatmap = create_cone_heatmap(
+        tip,
+        direction,
+        small_w,
+        small_h,
+        cone_length_fraction=cone_length,
+        cone_width_fraction=cone_width,
+        cone_widening=cone_widening,
+        near_ramp_fraction=cone_near_ramp,
+    )
     heatmap = torch.as_tensor(heatmap, dtype=torch.float32)[None, None]
     heatmap = F.interpolate(
         heatmap, size=(IMAGE_SIZE, IMAGE_SIZE),
@@ -97,24 +121,34 @@ def make_patch_prior(tip, direction, image_w, image_h):
     return heatmap[0, 0], patch_prior
 
 
-def prior_to_mask(patch_prior, num_prefix_tokens):
+def prior_to_mask(
+    patch_prior,
+    num_prefix_tokens,
+    prior_scale=PRIOR_SCALE,
+    cls_prior=CLS_PRIOR,
+):
     """Convert a patch grid to a broadcastable token prior."""
     patches = patch_prior.flatten()
     max_value = patches.max().item()
     if max_value > 0:
-        patches = patches / max_value * PRIOR_SCALE
+        patches = patches / max_value * prior_scale
     else:
         patches = torch.zeros_like(patches)
     prefix = torch.full(
-        (num_prefix_tokens,), CLS_PRIOR, dtype=patches.dtype,
+        (num_prefix_tokens,), cls_prior, dtype=patches.dtype,
         device=patches.device,
     )
     return torch.cat([prefix, patches], dim=0)[None, :, None]
 
 
-def get_token_norm_map(model, image_tensor, td=None):
+def get_token_norm_map(
+    model,
+    image_tensor,
+    td=None,
+    attention_layer_from_end=ATTENTION_LAYER_FROM_END,
+):
     """Token-norm i et mellomliggende ViT-lag, ikke QK attention-vekter."""
-    layer = len(model.blocks) - ATTENTION_LAYER_FROM_END
+    layer = len(model.blocks) - attention_layer_from_end
     if not (1 <= layer <= len(model.blocks)):
         raise ValueError("Ugyldig ATTENTION_LAYER_FROM_END")
 
@@ -128,10 +162,21 @@ def get_token_norm_map(model, image_tensor, td=None):
     return norms.reshape(side, side)
 
 
-def run_pointing(model, image_tensor, features, pointing_mask):
+def run_pointing(
+    model,
+    image_tensor,
+    features,
+    pointing_mask,
+    attention_layer_from_end=ATTENTION_LAYER_FROM_END,
+):
     """Lag top-down feedback fra pekeprioren og returner token-norm i andre pass."""
     td = model.feedback(features * pointing_mask * model.feedback_aug)
-    return get_token_norm_map(model, image_tensor, td)
+    return get_token_norm_map(
+        model,
+        image_tensor,
+        td,
+        attention_layer_from_end=attention_layer_from_end,
+    )
 
 
 def mass_in_prior(token_norm_map, patch_prior):

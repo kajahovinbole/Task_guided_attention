@@ -14,11 +14,12 @@ def load_yolo_model(model_name="yolo26n.pt"):
     return YOLO(model_name)
 
 
-def detect_objects(model, frame_bgr, confidence=0.05):
+def detect_objects(model, frame_bgr, confidence=0.05, image_size=640):
     """Return frame detections in the format consumed by full_pipeline.py."""
     result = model.predict(
         source=frame_bgr,
         conf=confidence,
+        imgsz=image_size,
         verbose=False,
     )[0]
     detections = []
