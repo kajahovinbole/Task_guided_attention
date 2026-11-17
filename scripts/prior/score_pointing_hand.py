@@ -18,18 +18,12 @@ Ingen valgt hånd: dersom ingen hånd passerer terskelen.
 # Paths and settings
 # --------------------------------------------------
 
-DATA_PATH = Path(
-    "results/combined_holistic_pose_hand/tom_scene28_2/ensemble_results.json"
-)
-
-IMAGE_DIR = Path(
-    "/Users/kajahovinbole/Task_guided_attention/"
-    "data/3_exported_from_fiftyone/1_2_3_andrea_merged/data"
-)
-
-OUTPUT_DIR = Path(
-    "results/combined_holistic_pose_hand/pointing_hand_scores"
-)
+ROOT = Path(__file__).resolve().parents[2]
+IMAGE_DIR = ROOT / "data" / "3_exported_from_fiftyone" / "1_2_3_andrea_merged" / "data"
+RUN_NAME = IMAGE_DIR.parent.name
+ENSEMBLE_RUN_DIR = ROOT / "results" / "combined_holistic_pose_hand" / RUN_NAME
+DATA_PATH = ENSEMBLE_RUN_DIR / "ensemble_results.json"
+OUTPUT_DIR = ENSEMBLE_RUN_DIR / "pointing_hand_scores"
 
 THRESHOLD = 0.6
 
@@ -136,9 +130,9 @@ def score_pointing_hand(landmark_list):
         )
 
     score = (
-        0.60 * index_score
-        + 0.25 * curled_score
-        + 0.15 * extension_score
+        0.65 * index_score
+        + 0.35 * curled_score
+        + 0 * extension_score
     )
 
     return {

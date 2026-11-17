@@ -25,12 +25,13 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 IMAGE_DIR = (
     ROOT / "data/3_exported_from_fiftyone/1_2_3_andrea_merged/data"
 )
+RUN_NAME = IMAGE_DIR.parent.name
 
 MODEL_DIR = ROOT / "models/mediapipe"
 HOLISTIC_PATH = MODEL_DIR / "holistic_landmarker.task"
 HAND_PATH = MODEL_DIR / "hand_landmarker.task"
 
-OUTPUT_DIR = ROOT / "results/combined_holistic_pose_hand/tom_scene28_2"
+OUTPUT_DIR = ROOT / "results" / "combined_holistic_pose_hand" / RUN_NAME
 VIS_DIR = OUTPUT_DIR / "visualizations"
 CROP_DIR = OUTPUT_DIR / "fallback_crops"
 

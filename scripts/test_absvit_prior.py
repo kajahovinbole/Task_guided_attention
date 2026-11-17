@@ -28,9 +28,11 @@ from scripts.prior.create_numeric_prior import create_cone_heatmap
 # --------------------------------------------------
 DATA_DIR = ROOT / "data" / "funker_bra_20okt"
 IMAGE_DIR = DATA_DIR / "imgs"
-PRIOR_DIR = DATA_DIR / "numeric_prior"
-CHECKPOINT = ROOT / "checkpoints" / "absvit_tiny_patch8_224_gap.pth"#"absvit_tiny.pth"
-OUTPUT_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9_s25" #"absvit_prior_test"
+ENSEMBLE_RUN_NAME = "1_2_3_andrea_merged"
+ENSEMBLE_RUN_DIR = ROOT / "results" / "combined_holistic_pose_hand" / ENSEMBLE_RUN_NAME
+PRIOR_DIR = ENSEMBLE_RUN_DIR / "numeric_pointing_prior"
+CHECKPOINT = ROOT / "checkpoints" / "absvit_tiny_patch8_224_gap.pth"
+OUTPUT_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9"
 # Kartene lagres her slik at evaluate_bbox.py kan bruke dem.
 MAPS_DIR = OUTPUT_DIR / "maps"
 
@@ -126,6 +128,14 @@ def find_image(stem):
 
 
 def main():
+    if not CHECKPOINT.is_file():
+        raise FileNotFoundError(
+            f"Fant ikke AbSViT patch-8 checkpoint: {CHECKPOINT}. "
+            "Denne modellen trenger et eget patch-8 GAP-checkpoint."
+        )
+    if not PRIOR_DIR.is_dir():
+        raise FileNotFoundError(f"Fant ikke prior-mappen: {PRIOR_DIR}")
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     MAPS_DIR.mkdir(parents=True, exist_ok=True)
 
