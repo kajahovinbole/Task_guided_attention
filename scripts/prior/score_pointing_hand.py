@@ -136,9 +136,9 @@ def score_pointing_hand(landmark_list):
         )
 
     score = (
-        0.60 * index_score
-        + 0.25 * curled_score
-        + 0.15 * extension_score
+        0.65 * index_score
+        + 0.35 * curled_score
+        + 0 * extension_score
     )
 
     return {

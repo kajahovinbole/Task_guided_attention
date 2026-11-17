@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
 
 # Kjeglen og pekedataene hentes fra create_numeric_prior.py, så
 # visualiseringen alltid viser samme kjegle som AbSViT får.
-from scripts.create_numeric_prior import (
+from scripts.prior.create_numeric_prior import (
     CONE_LENGTH,
     create_cone_heatmap,
     get_pointing_data,
