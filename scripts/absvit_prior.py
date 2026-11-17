@@ -6,9 +6,6 @@ models.AbSViT og scripts.create_numeric_prior.
 from pathlib import Path
 import sys
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -51,13 +48,39 @@ MEAN = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
 STD = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
 
 
+def preprocess_rgb(rgb):
+    """Convert an RGB frame/array to normalized AbSViT input [1,3,224,224]."""
+    image = Image.fromarray(np.asarray(rgb, dtype=np.uint8)).convert("RGB")
+    resized = image.resize((IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BICUBIC)
+    array = np.asarray(resized).copy()
+    tensor = torch.from_numpy(array).permute(2, 0, 1).float() / 255.0
+    return ((tensor - MEAN) / STD).unsqueeze(0)
+
+
 def load_image(path):
     """Returnerer (normalisert [1,3,224,224], RGB-array, (W,H))."""
     image = Image.open(path).convert("RGB")
-    resized = image.resize((IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BICUBIC)
-    rgb = np.asarray(resized).copy()
-    tensor = torch.from_numpy(rgb).permute(2, 0, 1).float() / 255.0
-    return ((tensor - MEAN) / STD).unsqueeze(0), rgb, image.size
+    rgb = np.asarray(image.resize(
+        (IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BICUBIC
+    )).copy()
+    return preprocess_rgb(np.asarray(image)), rgb, image.size
+
+
+def load_abs_vit_model(checkpoint_path, device="cpu"):
+    """Load the patch-8 GAP model and checkpoint used by this workflow."""
+    checkpoint_path = Path(checkpoint_path)
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(
+            f"Fant ikke AbSViT patch-8 GAP-checkpoint: {checkpoint_path}"
+        )
+    model = absvit_tiny_patch8_224_gap(pretrained=False)
+    checkpoint = torch.load(
+        checkpoint_path, map_location="cpu", weights_only=False
+    )
+    model.load_state_dict(checkpoint.get("model", checkpoint))
+    model.to(device)
+    model.eval()
+    return model
 
 
 def make_patch_prior(tip, direction, image_w, image_h):
@@ -75,7 +98,7 @@ def make_patch_prior(tip, direction, image_w, image_h):
 
 
 def prior_to_mask(patch_prior, num_prefix_tokens):
-    """[14,14] -> [1,197,1] når modellen har ett CLS-token."""
+    """Convert a patch grid to a broadcastable token prior."""
     patches = patch_prior.flatten()
     max_value = patches.max().item()
     if max_value > 0:
@@ -128,6 +151,10 @@ def find_image(stem):
 
 
 def main():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     if not CHECKPOINT.is_file():
         raise FileNotFoundError(
             f"Fant ikke AbSViT patch-8 checkpoint: {CHECKPOINT}. "
@@ -140,10 +167,7 @@ def main():
     MAPS_DIR.mkdir(parents=True, exist_ok=True)
 
     #model = absvit_tiny_patch16_224(pretrained=False)
-    model = absvit_tiny_patch8_224_gap(pretrained=False)
-    checkpoint = torch.load(CHECKPOINT, map_location="cpu", weights_only=False)
-    model.load_state_dict(checkpoint.get("model", checkpoint))
-    model.eval()
+    model = load_abs_vit_model(CHECKPOINT)
 
     print(f"{'bilde':<28} {'tilfeldig':>9} {'bottom-up':>10} {'peking':>9}")
     all_masses = []

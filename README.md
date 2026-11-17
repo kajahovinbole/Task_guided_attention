@@ -37,9 +37,29 @@ The prior experiment uses a separately trained/configured patch-8 GAP checkpoint
 
 Run commands from the repository root. Local datasets and checkpoints must exist at the paths described below.
 
+### Video pipeline
+
+The full pipeline takes a video file (or camera index), finds hands with the combined MediaPipe approach, selects a pointing hand, conditions AbSViT with the cone prior, detects objects with YOLO, and ranks YOLO boxes by their mean AbSViT saliency. YOLO confidence is used as an eligibility threshold and is kept in the per-frame records.
+
+The pipeline reuses the pointing-hand score from `scripts/prior/score_pointing_hand.py`, pointing geometry from `scripts/prior/create_numeric_prior.py`, AbSViT preprocessing/prior/model helpers from `scripts/absvit_prior.py`, and YOLO frame inference from `scripts/yolo_detection.py`. This keeps image experiments and video processing on the same implementations where their workflows overlap.
+
+```bash
+uv run python main.py path/to/video.mp4 --show
+```
+
+For a camera, pass its index, usually `0`. The patch-8 GAP checkpoint must be present at `checkpoints/absvit_tiny_patch8_224_gap.pth`; Ultralytics loads `yolo26n.pt` by default.
+
+The default output folder is `results/video_pipeline/<video-name>/` and contains:
+
+- `selected_object.mp4`: the selected object bounding box per frame.
+- `verification.mp4`: all YOLO boxes and confidences, selected hand landmarks, and the AbSViT saliency overlay.
+- `frames.jsonl`: one metadata record and one record per processed frame, including hand scores and all object detections.
+
+Use `--max-frames 100` for a short run, `--output-dir PATH` to choose another output folder, and `--device cpu|mps|cuda` to select the AbSViT device. Press `q` to stop the display when running with `--show`.
+
 ### MediaPipe scripts
 
-The preferred MediaPipe pipeline to build on is `combining_holisitc_pose_hand.py`. It combines Holistic pose/hand detections with the standalone Hand Landmarker and crop fallback, then selects final left/right hand landmarks. Its output folder is named after the input dataset folder. With the current input, the ensemble JSON, visualizations, fallback crops, scores, priors, and derived visualizations are grouped under `results/combined_holistic_pose_hand/1_2_3_andrea_merged/`:
+The preferred MediaPipe pipeline to build on is `combining_holisitc_pose_hand.py`. Both this image-folder script and `scripts/full_pipeline.py` use the shared `VideoHandDetector` implementation in `src/video_hand_detector.py`. It combines Holistic pose/hand detections with the standalone Hand Landmarker and crop fallback, then selects final left/right hand landmarks. The image script uses MediaPipe image mode; the video pipeline uses video mode for frame-to-frame tracking. Its output folder is named after the input dataset folder. With the current input, the ensemble JSON, visualizations, fallback crops, scores, priors, and derived visualizations are grouped under `results/combined_holistic_pose_hand/1_2_3_andrea_merged/`:
 
 ```bash
 uv run python scripts/run_mediapipe/combining_holisitc_pose_hand.py
