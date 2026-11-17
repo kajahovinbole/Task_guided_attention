@@ -31,7 +31,13 @@ mkdir -p checkpoints
 curl -L "https://berkeley.box.com/shared/static/4z5y181r02b8034r2b8109u8x2c15t14.pth" -o checkpoints/absvit_tiny.pth
 ```
 
-The prior experiment uses a separately trained/configured patch-8 GAP checkpoint named `checkpoints/absvit_tiny_patch8_224_gap.pth`. It is not included in the repository; the baseline checkpoint above is not a substitute for it.
+The prior experiment and video pipeline use the AbSViT Tiny patch-8 GAP checkpoint. Download the checkpoint used by the official AbSViT demo with:
+
+```bash
+curl -fL "https://berkeley.box.com/shared/static/7415yz4d1l5z0ur6x32k35f8y99zgynq.pth" -o checkpoints/absvit_tiny_patch8_224_gap.pth
+```
+
+This is a different architecture from `absvit_tiny.pth` above, which is patch-16, so the files cannot be substituted for each other.
 
 ## Current workflows
 
