@@ -30,7 +30,7 @@ DATA_DIR = ROOT / "data" / "funker_bra_20okt"
 IMAGE_DIR = DATA_DIR / "imgs"
 PRIOR_DIR = DATA_DIR / "numeric_prior"
 CHECKPOINT = ROOT / "checkpoints" / "absvit_tiny_patch8_224_gap.pth"#"absvit_tiny.pth"
-OUTPUT_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9" #"absvit_prior_test"
+OUTPUT_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9_s25" #"absvit_prior_test"
 # Kartene lagres her slik at evaluate_bbox.py kan bruke dem.
 MAPS_DIR = OUTPUT_DIR / "maps"
 
@@ -39,7 +39,7 @@ PATCH_SIZE = 8
 
 # Valgt fra tidligere sveip. Bør senere valideres mot objektlokalisering,
 # ikke bare andelen token-norm inne i den geometriske kjeglen.
-PRIOR_SCALE = 40.0
+PRIOR_SCALE = 25.0
 CLS_PRIOR = 0.0
 
 # Antall lag fra slutten til laget hvor token-normen visualiseres.
