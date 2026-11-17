@@ -9,22 +9,13 @@ import numpy as np
 # Paths and settings
 # --------------------------------------------------
 
-SCORES_PATH = Path(
-    "results/combined_holistic_pose_hand/pointing_hand_scores/scores.json"
-)
-
-LANDMARKS_PATH = Path(
-    "results/combined_holistic_pose_hand/tom_scene28_2/ensemble_results.json"
-)
-
-IMAGE_DIR = Path(
-    "data/3_exported_from_fiftyone/1_2_3_andrea_merged/data"
-)
-
-OUTPUT_DIR = Path(
-    "results/combined_holistic_pose_hand/"
-    "pointing_direction_visualizations"
-)
+ROOT = Path(__file__).resolve().parents[2]
+IMAGE_DIR = ROOT / "data" / "3_exported_from_fiftyone" / "1_2_3_andrea_merged" / "data"
+RUN_NAME = IMAGE_DIR.parent.name
+ENSEMBLE_RUN_DIR = ROOT / "results" / "combined_holistic_pose_hand" / RUN_NAME
+SCORES_PATH = ENSEMBLE_RUN_DIR / "pointing_hand_scores" / "scores.json"
+LANDMARKS_PATH = ENSEMBLE_RUN_DIR / "ensemble_results.json"
+OUTPUT_DIR = ENSEMBLE_RUN_DIR / "pointing_direction_visualizations"
 
 # Arrow length as a fraction of the image diagonal
 ARROW_LENGTH = 0.25

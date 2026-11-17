@@ -5,7 +5,7 @@ import sys
 import cv2
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -22,11 +22,11 @@ from scripts.prior.create_numeric_prior import (
 # Paths
 # --------------------------------------------------
 
-JSON_PATH = Path("data/results/mediapipe_wrist_hand/hand_landmarks.json")
-IMAGE_DIR = Path("data/exported/merged/data")
-OUTPUT_DIR = Path("data/results/pointing_prior_heatmap_visualization")
-
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+IMAGE_DIR = ROOT / "data" / "3_exported_from_fiftyone" / "1_2_3_andrea_merged" / "data"
+RUN_NAME = IMAGE_DIR.parent.name
+ENSEMBLE_RUN_DIR = ROOT / "results" / "combined_holistic_pose_hand" / RUN_NAME
+JSON_PATH = ENSEMBLE_RUN_DIR / "ensemble_results.json"
+OUTPUT_DIR = ENSEMBLE_RUN_DIR / "pointing_prior_visualizations"
 
 
 # Styrke på heatmap-overlay
@@ -72,91 +72,103 @@ def overlay_heatmap(image, heatmap):
 # Main
 # --------------------------------------------------
 
-with open(JSON_PATH, "r") as f:
-    data = json.load(f)
+def main():
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Støtt både JSON som liste og JSON med "images"-felt
-images = data if isinstance(data, list) else data.get("images", [])
+    if not JSON_PATH.is_file():
+        raise FileNotFoundError(f"Fant ikke landemerke-JSON: {JSON_PATH}")
 
-processed = 0
+    if not IMAGE_DIR.is_dir():
+        raise FileNotFoundError(f"Fant ikke bildemappen: {IMAGE_DIR}")
 
-for image_entry in images:
+    with JSON_PATH.open(encoding="utf-8") as f:
+        data = json.load(f)
 
-    image_name = image_entry.get("image")
+    # Støtt både JSON som liste og JSON med "images"-felt.
+    images = data if isinstance(data, list) else data.get("images", [])
 
-    if not image_name:
-        continue
+    processed = 0
 
-    image_path = IMAGE_DIR / Path(image_name).name
+    for image_entry in images:
 
-    if not image_path.exists():
-        print(f"Mangler bilde: {image_path}")
-        continue
+        image_name = image_entry.get("image")
 
-    image = cv2.imread(str(image_path))
-
-    if image is None:
-        print(f"Kunne ikke lese: {image_path}")
-        continue
-
-    height, width = image.shape[:2]
-
-    hands = image_entry.get("hands", [])
-
-    # Ett resultat per hånd
-    for hand_index, hand in enumerate(hands):
-
-        pointing_data = get_pointing_data(hand)
-
-        if pointing_data is None:
+        if not image_name:
             continue
 
-        tip, direction = pointing_data
+        image_path = IMAGE_DIR / Path(image_name).name
 
-        heatmap = create_cone_heatmap(
-            tip,
-            direction,
-            width,
-            height,
-        )
+        if not image_path.exists():
+            print(f"Mangler bilde: {image_path}")
+            continue
 
-        result = overlay_heatmap(image, heatmap)
+        image = cv2.imread(str(image_path))
 
-        # Tegn fingertupp
-        tip_x = int(tip[0] * width)
-        tip_y = int(tip[1] * height)
+        if image is None:
+            print(f"Kunne ikke lese: {image_path}")
+            continue
 
-        cv2.circle(
-            result,
-            (tip_x, tip_y),
-            7,
-            (255, 255, 255),
-            -1,
-        )
+        height, width = image.shape[:2]
 
-        # Tegn pil i pekretningen
-        arrow_length = int(CONE_LENGTH * np.sqrt(width**2 + height**2))
+        hands = image_entry.get("hands", {})
 
-        end_x = int(tip_x + direction[0] * arrow_length)
-        end_y = int(tip_y + direction[1] * arrow_length)
+        if isinstance(hands, dict):
+            hand_entries = [
+                (hand_index, hands.get(side))
+                for hand_index, side in enumerate(("left", "right"))
+            ]
+        elif isinstance(hands, list):
+            hand_entries = list(enumerate(hands))
+        else:
+            hand_entries = []
 
-        cv2.arrowedLine(
-            result,
-            (tip_x, tip_y),
-            (end_x, end_y),
-            (255, 255, 255),
-            3,
-            tipLength=0.04,
-        )
+        # Ett resultat per hånd
+        for hand_index, hand in hand_entries:
+            if not isinstance(hand, dict):
+                continue
 
-        output_name = (
-            f"{image_path.stem}_hand_{hand_index}_prior.jpg"
-        )
+            pointing_data = get_pointing_data(
+                hand,
+                image_entry.get("width", image_entry.get("image_width")),
+                image_entry.get("height", image_entry.get("image_height")),
+            )
 
-        output_path = OUTPUT_DIR / output_name
+            if pointing_data is None:
+                continue
 
-        cv2.imwrite(str(output_path), result)
+            tip, direction = pointing_data
 
-        processed += 1
+            heatmap = create_cone_heatmap(tip, direction, width, height)
 
-print(f"Ferdig. Lagret {processed} heatmaps i {OUTPUT_DIR}")
+            result = overlay_heatmap(image, heatmap)
+
+            # Tegn fingertupp
+            tip_x = int(tip[0] * width)
+            tip_y = int(tip[1] * height)
+
+            cv2.circle(result, (tip_x, tip_y), 7, (255, 255, 255), -1)
+
+            # Tegn pil i pekretningen
+            arrow_length = int(CONE_LENGTH * np.sqrt(width**2 + height**2))
+
+            end_x = int(tip_x + direction[0] * arrow_length)
+            end_y = int(tip_y + direction[1] * arrow_length)
+
+            cv2.arrowedLine(result, (tip_x, tip_y), (end_x, end_y),
+                            (255, 255, 255), 3, tipLength=0.04)
+
+            output_name = f"{image_path.stem}_hand_{hand_index}_prior.jpg"
+
+            output_path = OUTPUT_DIR / output_name
+
+            if not cv2.imwrite(str(output_path), result):
+                print(f"Kunne ikke lagre: {output_path}")
+                continue
+
+            processed += 1
+
+    print(f"Ferdig. Lagret {processed} heatmaps i {OUTPUT_DIR}")
+
+
+if __name__ == "__main__":
+    main()

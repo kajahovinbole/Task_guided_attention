@@ -1,7 +1,8 @@
 """Mål hvor mye av fokuset som havner innenfor fasit-boksen.
 
 Leser kartene som test_absvit_prior.py lagrer i absvit_prior_test/maps/
-og boksene i data/labels.json (COCO: [x, y, bredde, høyde] i originalpiksler).
+og boksene i data/funker_bra_20okt/labels.json (COCO: [x, y, bredde,
+høyde] i originalpiksler).
 
 For hvert bilde regnes ut:
   - tilfeldig  : boksens andel av bildet (forventet verdi ved jevnt fokus)
@@ -28,7 +29,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 
-LABELS_PATH = ROOT / "data" / "labels.json"
+LABELS_PATH = ROOT / "data" / "funker_bra_20okt" / "labels.json"
 IMAGE_DIR = ROOT / "data" / "funker_bra_20okt" / "imgs"
 MAPS_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9" / "maps"    #absvit_prior_test
 OUTPUT_DIR = ROOT / "data" / "results" / "bbox_eval_28x28_lay9" #bbox_eval
