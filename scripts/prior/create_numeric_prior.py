@@ -32,6 +32,7 @@ def create_cone_heatmap(
     cone_width_fraction=CONE_WIDTH,
     cone_widening=CONE_WIDENING,
     near_ramp_fraction=CONE_NEAR_RAMP,
+    longitudinal_decay_fraction=None,
 ):
     """Returnerer en numerisk heatmap med verdier i [0, 1]."""
 
@@ -55,6 +56,12 @@ def create_cone_heatmap(
         longitudinal = np.clip(t / near_ramp, 0, 1)
     else:
         longitudinal = np.ones_like(t, dtype=np.float64)
+
+    if longitudinal_decay_fraction is not None:
+        if longitudinal_decay_fraction <= 0:
+            raise ValueError("longitudinal_decay_fraction must be positive")
+        decay_distance = longitudinal_decay_fraction * cone_length
+        longitudinal *= np.exp(-np.maximum(t, 0) / decay_distance)
 
     valid = (t > 0) & (t < cone_length)
     heatmap = (lateral * longitudinal * valid).astype(np.float32)

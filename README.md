@@ -48,7 +48,7 @@ Run commands from the repository root. Local datasets and checkpoints must exist
 
 ### Video pipeline
 
-The full pipeline takes a video file (or camera index), finds hands with the combined MediaPipe approach, selects a pointing hand, conditions AbSViT with the cone prior, detects objects with YOLO, and ranks YOLO boxes using AbSViT focus and YOLO confidence. A focus heatmap is drawn on every frame of the verification video: it is prior-conditioned when a pointing hand is available and bottom-up otherwise. Object selection still requires a valid pointing prior.
+The full pipeline takes a video file (or camera index), finds hands with the combined MediaPipe approach, selects a pointing hand, conditions AbSViT with the cone prior, detects objects with YOLO, and ranks YOLO boxes using AbSViT focus and YOLO confidence. A focus heatmap is drawn on every frame of the verification video: it is prior-conditioned when a pointing hand is available and bottom-up otherwise. Object selection still requires a valid pointing prior. Optional reach adaptation keeps the cone's length fixed and adjusts how quickly heat fades along it: a more extended arm keeps more heat toward the far end.
 
 The pipeline reuses the pointing-hand score from `scripts/prior/score_pointing_hand.py`, pointing geometry from `scripts/prior/create_numeric_prior.py`, AbSViT preprocessing/prior/model helpers from `scripts/absvit_prior.py`, and YOLO frame inference from `scripts/yolo_detection.py`. This keeps image experiments and video processing on the same implementations where their workflows overlap.
 
@@ -70,17 +70,17 @@ The default output folder is `results/video_pipeline/<video-name>/` and contains
 
 Use `--max-frames 100` for a short run or `--output-dir PATH` to choose another output folder. Add `--show` to display both outputs while processing. Device and other tunable model settings are in `configs/full_pipeline.py`.
 
-### Experiment with reach-adaptive cone length
+### Experiment with reach-adaptive heat
 
-Compare the fixed cone with a cone scaled from arm reach before enabling the option in the full pipeline:
+Compare uniform heat with reach-adaptive heat inside the same fixed cone:
 
 ```bash
 uv run python scripts/experiment_reach_adaptive_cone.py path/to/reach_video.mov --show
 ```
 
-The script writes a side-by-side video and per-frame measurements to `results/reach_cone_experiment/<video-name>/`. It uses the same combined hand detector and reach-measurement functions as the full pipeline. The reach score is an experimental 2D pose proxy, not a calibrated distance estimate. Adjust `--min-cone-length`, `--max-cone-length`, `--elbow-weight`, `--shoulder-weight`, and `--score-alpha` to compare mappings.
+The script writes a side-by-side video and per-frame measurements to `results/reach_heat_experiment/<video-name>/`. It uses the same combined hand detector and reach-measurement functions as the full pipeline. The reach score is an experimental 2D pose proxy, not a calibrated distance estimate. Adjust `--near-heat-extent`, `--far-heat-extent`, `--elbow-weight`, `--shoulder-weight`, and `--score-alpha` to compare mappings.
 
-Reach adaptation is off by default in the full pipeline. Set `use_reach_adaptive_cone = True` in `configs/full_pipeline.py` to enable it; the range, signal weights, smoothing, and missing-pose hold are configurable there.
+Set `use_reach_adaptive_heat = True` in `configs/full_pipeline.py` to enable it; the heat falloff range, signal weights, smoothing, and missing-pose hold are configurable there. The cone length remains `cone_length` for every frame.
 
 ### MediaPipe scripts
 
@@ -137,4 +137,4 @@ The experiment writes maps and figures under `data/results/absvit_prior_test_28x
 
 - Data, checkpoints, and generated results are intentionally excluded from Git. Keep copies elsewhere if they need to be preserved.
 - Some dataset preparation scripts use paths tied to particular local exports. Check their path settings before using them with a different dataset.
-- The reach-adaptive cone uses 2D pose geometry as a relative reach proxy; it is not a calibrated physical-distance estimate.
+- Reach-adaptive heat uses 2D pose geometry as a relative reach proxy; it is not a calibrated physical-distance estimate.

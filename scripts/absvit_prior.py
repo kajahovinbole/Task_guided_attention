@@ -98,6 +98,7 @@ def make_patch_prior(
     cone_width=CONE_WIDTH,
     cone_widening=CONE_WIDENING,
     cone_near_ramp=CONE_NEAR_RAMP,
+    longitudinal_decay_fraction=None,
 ):
     """Lag pekekjegle med originalt sideforhold, resample til ViT-grid."""
     small_w = 448
@@ -111,6 +112,7 @@ def make_patch_prior(
         cone_width_fraction=cone_width,
         cone_widening=cone_widening,
         near_ramp_fraction=cone_near_ramp,
+        longitudinal_decay_fraction=longitudinal_decay_fraction,
     )
     heatmap = torch.as_tensor(heatmap, dtype=torch.float32)[None, None]
     heatmap = F.interpolate(

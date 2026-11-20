@@ -45,10 +45,10 @@ class PipelineConfig:
     cone_widening: float = 0.12
     cone_near_ramp: float = 0.05
 
-    # Optional arm-reach proxy for per-frame cone length
-    use_reach_adaptive_cone: bool = False
-    reach_min_cone_length: float = 0.20
-    reach_max_cone_length: float = 0.60
+    # Optional arm-reach proxy for heat falloff within the fixed cone.
+    use_reach_adaptive_heat: bool = True
+    reach_near_heat_extent: float = 0.35
+    reach_far_heat_extent: float = 1.50
     reach_elbow_weight: float = 0.70
     reach_shoulder_weight: float = 0.30
     reach_score_alpha: float = 0.35
@@ -94,8 +94,8 @@ class PipelineConfig:
             raise ValueError("heatmap_opacity må være mellom 0 og 1.")
         if self.yolo_image_size <= 0 or self.hand_crop_size <= 0:
             raise ValueError("Bildestørrelse og crop-størrelse må være positive.")
-        if not 0 < self.reach_min_cone_length <= self.reach_max_cone_length:
-            raise ValueError("Reach cone lengths must satisfy 0 < min <= max.")
+        if not 0 < self.reach_near_heat_extent <= self.reach_far_heat_extent:
+            raise ValueError("Reach heat extents must satisfy 0 < near <= far.")
         if self.reach_elbow_weight < 0 or self.reach_shoulder_weight < 0:
             raise ValueError("Reach score weights cannot be negative.")
         if self.reach_elbow_weight + self.reach_shoulder_weight <= 0:

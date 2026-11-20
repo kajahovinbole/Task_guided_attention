@@ -85,12 +85,16 @@ def make_reach_score(arm_measurements, elbow_weight=0.7, shoulder_weight=0.3):
     ) / weight_total
 
 
-def adaptive_cone_length(reach_score, min_length, max_length):
-    """Map the normalized reach proxy linearly to a cone-length interval."""
+def adaptive_heat_extent(reach_score, min_extent, max_extent):
+    """Map reach proxy to falloff distance within a cone of fixed geometry.
+
+    Extents are multiples of cone length. A larger extent retains more heat
+    toward the cone's far end; it never changes the cone's support.
+    """
     if reach_score is None:
         return None
     score = float(np.clip(reach_score, 0.0, 1.0))
-    return float(min_length + score * (max_length - min_length))
+    return float(min_extent + score * (max_extent - min_extent))
 
 
 class ReachScoreSmoother:

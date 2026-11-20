@@ -1,8 +1,8 @@
-"""Visual experiment: compare a fixed cone with one scaled by arm reach.
+"""Visual experiment: compare fixed and reach-adaptive heat in a fixed cone.
 
 This is deliberately separate from the production video pipeline. It uses
 2D pose landmarks to inspect whether elbow and shoulder angles are useful
-proxies for near/far pointing and compare fixed/adaptive cone lengths.
+proxies for near/far pointing and compare heat falloff profiles.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from scripts.prior.create_numeric_prior import (
 from scripts.prior.score_pointing_hand import score_pointing_hand
 from src.reach_estimator import (
     ReachScoreSmoother,
-    adaptive_cone_length,
+    adaptive_heat_extent,
     make_reach_score,
     measure_arm,
 )
@@ -43,7 +43,7 @@ def parse_source(value):
 def build_parser():
     parser = argparse.ArgumentParser(
         description=(
-            "Compare fixed and arm-reach-adaptive pointing cones on a video. "
+            "Compare fixed-cone heat profiles using arm reach on a video. "
             "This experiment does not modify the full pipeline."
         )
     )
@@ -51,21 +51,21 @@ def build_parser():
     parser.add_argument(
         "--output-dir",
         type=Path,
-        help="Output folder (default: results/reach_cone_experiment/<source-name>)",
+        help="Output folder (default: results/reach_heat_experiment/<source-name>)",
     )
     parser.add_argument("--max-frames", type=int, help="Optional frame limit")
     parser.add_argument("--show", action="store_true", help="Show the comparison live")
     parser.add_argument(
-        "--min-cone-length",
+        "--near-heat-extent",
         type=float,
-        default=0.20,
-        help="Adaptive cone length for a fully bent/near reach, as frame-diagonal fraction",
+        default=0.35,
+        help="Near-reach heat decay distance, as a fraction of fixed cone length",
     )
     parser.add_argument(
-        "--max-cone-length",
+        "--far-heat-extent",
         type=float,
-        default=CONE_LENGTH,
-        help="Adaptive cone length for a fully extended/far reach, as frame-diagonal fraction",
+        default=1.50,
+        help="Far-reach heat decay distance, as a fraction of fixed cone length",
     )
     parser.add_argument(
         "--elbow-weight",
@@ -105,7 +105,7 @@ def choose_hand(hands):
     return max(scored, key=lambda hand: hand["pointing_score"]) if scored else None
 
 
-def make_cone(tip, direction, width, height, length):
+def make_cone(tip, direction, width, height, heat_extent=None):
     grid_width = 448
     grid_height = max(1, round(grid_width * height / width))
     cone = create_cone_heatmap(
@@ -113,7 +113,8 @@ def make_cone(tip, direction, width, height, length):
         direction,
         grid_width,
         grid_height,
-        cone_length_fraction=length,
+        cone_length_fraction=CONE_LENGTH,
+        longitudinal_decay_fraction=heat_extent,
     )
     return cv2.resize(cone, (width, height), interpolation=cv2.INTER_LINEAR)
 
@@ -130,7 +131,7 @@ def overlay_cone(frame, cone, opacity=0.45):
 
 
 def annotate_panel(image, title, hand, arm, raw_score, smooth_score,
-                   cone_length, pointing_threshold):
+                   heat_extent, pointing_threshold):
     cv2.putText(
         image, title, (18, 32), cv2.FONT_HERSHEY_SIMPLEX,
         0.85, (255, 255, 255), 2, cv2.LINE_AA,
@@ -152,7 +153,10 @@ def annotate_panel(image, title, hand, arm, raw_score, smooth_score,
             f"Elbow angle: {arm['elbow_angle_degrees']:.1f} deg",
             f"Shoulder/torso: {arm['shoulder_torso_angle_degrees']:.1f} deg",
             f"Reach score raw/smoothed: {raw_score:.2f}/{smooth_score:.2f}",
-            f"Cone length: {cone_length:.3f} x frame diagonal",
+            (
+                "Uniform heat along cone" if heat_extent is None else
+                f"Heat decay extent: {heat_extent:.2f} x cone length"
+            ),
         ])
     else:
         rows.append("Pose arm measurements unavailable")
@@ -178,17 +182,17 @@ def run_experiment(args):
         raise ValueError("Minst én armvinkel-vekt må være større enn null.")
     if not 0.0 <= args.min_pointing_score <= 1.0:
         raise ValueError("--min-pointing-score må være mellom 0 og 1.")
-    if not 0 < args.min_cone_length <= args.max_cone_length:
-        raise ValueError("Kjeglelengdene må oppfylle 0 < min <= maks.")
+    if not 0 < args.near_heat_extent <= args.far_heat_extent:
+        raise ValueError("Heat extent må oppfylle 0 < nær <= fjern.")
     if args.max_frames is not None and args.max_frames <= 0:
         raise ValueError("--max-frames må være større enn null.")
 
     output_dir = args.output_dir or (
-        ROOT / "results" / "reach_cone_experiment" / _source_name(args.source)
+        ROOT / "results" / "reach_heat_experiment" / _source_name(args.source)
     )
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    video_path = output_dir / "reach_cone_comparison.mp4"
+    video_path = output_dir / "reach_heat_comparison.mp4"
     records_path = output_dir / "measurements.jsonl"
 
     capture = cv2.VideoCapture(args.source)
@@ -212,8 +216,9 @@ def run_experiment(args):
                 "source": str(args.source),
                 "fps": fps,
                 "fixed_cone_length": CONE_LENGTH,
-                "min_cone_length": args.min_cone_length,
-                "max_cone_length": args.max_cone_length,
+                "cone_length": CONE_LENGTH,
+                "near_heat_extent": args.near_heat_extent,
+                "far_heat_extent": args.far_heat_extent,
                 "elbow_weight": args.elbow_weight,
                 "shoulder_weight": args.shoulder_weight,
                 "score_alpha": args.score_alpha,
@@ -255,10 +260,10 @@ def run_experiment(args):
                     arm, args.elbow_weight, args.shoulder_weight
                 )
                 smooth_reach_score = reach_smoother.update(raw_reach_score)
-                adaptive_length = adaptive_cone_length(
+                adaptive_extent = adaptive_heat_extent(
                     smooth_reach_score,
-                    args.min_cone_length,
-                    args.max_cone_length,
+                    args.near_heat_extent,
+                    args.far_heat_extent,
                 )
 
                 pointing = None
@@ -272,39 +277,38 @@ def run_experiment(args):
 
                 fixed_view = frame.copy()
                 adaptive_view = frame.copy()
-                fixed_length = CONE_LENGTH
                 cone_tip = None
                 cone_direction = None
                 if pointing is not None:
                     cone_tip, cone_direction = pointing
                     fixed_cone = make_cone(
-                        cone_tip, cone_direction, width, height, fixed_length
+                        cone_tip, cone_direction, width, height
                     )
                     fixed_view = overlay_cone(frame, fixed_cone)
-                    if adaptive_length is not None:
+                    if adaptive_extent is not None:
                         adaptive_cone = make_cone(
-                            cone_tip, cone_direction, width, height, adaptive_length
+                            cone_tip, cone_direction, width, height, adaptive_extent
                         )
                         adaptive_view = overlay_cone(frame, adaptive_cone)
 
                 fixed_view = annotate_panel(
                     fixed_view,
-                    f"FIXED CONE ({fixed_length:.2f})",
+                    "FIXED CONE, UNIFORM HEAT",
                     hand,
                     arm,
                     raw_reach_score,
                     smooth_reach_score,
-                    fixed_length,
+                    None,
                     args.min_pointing_score,
                 )
                 adaptive_view = annotate_panel(
                     adaptive_view,
-                    "REACH-ADAPTIVE CONE",
+                    "FIXED CONE, REACH-ADAPTIVE HEAT",
                     hand,
                     arm,
                     raw_reach_score,
                     smooth_reach_score,
-                    adaptive_length,
+                    adaptive_extent,
                     args.min_pointing_score,
                 )
                 if pointing is None:
@@ -335,14 +339,14 @@ def run_experiment(args):
                     "arm_measurements": arm,
                     "reach_score_raw": raw_reach_score,
                     "reach_score_smoothed": smooth_reach_score,
-                    "fixed_cone_length": fixed_length,
-                    "adaptive_cone_length": adaptive_length,
+                    "cone_length": CONE_LENGTH,
+                    "adaptive_heat_extent": adaptive_extent,
                     "cone_tip": cone_tip,
                     "cone_direction": cone_direction,
                 }, ensure_ascii=False) + "\n")
 
                 if args.show:
-                    cv2.imshow("Fixed vs reach-adaptive cone", comparison)
+                    cv2.imshow("Fixed cone: uniform vs adaptive heat", comparison)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
                 frame_index += 1
