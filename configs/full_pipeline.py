@@ -17,7 +17,7 @@ class PipelineConfig:
 
     # Input/output runtime defaults
     output_root: Path = ROOT / "results" / "video_pipeline"
-    max_frames: int | None = None
+    max_frames: int | None = None #hele videoen
     show_windows: bool = False
 
     # Hand detection and pointing-hand selection
@@ -31,7 +31,7 @@ class PipelineConfig:
     min_yolo_confidence: float = 0.25
     saliency_weight: float = 0.80
     yolo_confidence_weight: float = 0.20
-    score_smoothing_alpha: float = 0.35
+    score_smoothing_alpha: float = 0.35     #lavere verdi gir mer smoothing
     bbox_smoothing_alpha: float = 0.45
     track_switch_margin: float = 0.08
     switch_confirmation_frames: int = 4
@@ -53,6 +53,12 @@ class PipelineConfig:
     reach_shoulder_weight: float = 0.30
     reach_score_alpha: float = 0.35
     reach_score_hold_missing_frames: int = 3
+
+    # Optional cone-width proxy based on apparent shoulder-to-hip size
+    use_person_scale_adaptive_cone: bool = True
+    person_scale_reference_fraction: float = 0.18
+    person_scale_min_width_factor: float = 0.40
+    person_scale_max_width_factor: float = 1.50
 
     # AbSViT prior and focus-map settings
     prior_scale: float = 25.0
@@ -104,6 +110,10 @@ class PipelineConfig:
             raise ValueError("reach_score_alpha must be in (0, 1].")
         if self.reach_score_hold_missing_frames < 0:
             raise ValueError("reach_score_hold_missing_frames cannot be negative.")
+        if self.person_scale_reference_fraction <= 0:
+            raise ValueError("person_scale_reference_fraction must be positive.")
+        if not 0 < self.person_scale_min_width_factor <= self.person_scale_max_width_factor:
+            raise ValueError("Person scale factors must satisfy 0 < min <= max.")
 
 
 DEFAULT_CONFIG = PipelineConfig()

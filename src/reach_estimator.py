@@ -97,6 +97,43 @@ def adaptive_heat_extent(reach_score, min_extent, max_extent):
     return float(min_extent + score * (max_extent - min_extent))
 
 
+def measure_torso_fraction(
+    pose_landmarks, image_height, pose_visibility=None, min_visibility=0.2
+):
+    """Estimate apparent torso size as shoulder-to-hip distance / image height."""
+    if pose_landmarks is None or len(pose_landmarks) <= 24 or image_height <= 0:
+        return None
+    required = (11, 12, 23, 24)
+    if pose_visibility is not None and any(
+        index >= len(pose_visibility)
+        or pose_visibility[index] < min_visibility
+        for index in required
+    ):
+        return None
+
+    points = [
+        np.asarray(
+            [pose_landmarks[index]["x"], pose_landmarks[index]["y"]],
+            dtype=float,
+        )
+        for index in required
+    ]
+    shoulder_midpoint = (points[0] + points[1]) / 2.0
+    hip_midpoint = (points[2] + points[3]) / 2.0
+    return _distance(shoulder_midpoint, hip_midpoint) / image_height
+
+
+def person_scale_width_factor(
+    torso_fraction, reference_fraction, min_factor=0.4, max_factor=1.5
+):
+    """Scale cone width from apparent torso size relative to a reference."""
+    if torso_fraction is None:
+        return None
+    if reference_fraction <= 0 or min_factor <= 0 or max_factor < min_factor:
+        raise ValueError("Person scale limits must satisfy 0 < min <= max.")
+    return float(np.clip(torso_fraction / reference_fraction, min_factor, max_factor))
+
+
 class ReachScoreSmoother:
     """EMA with a short missing-pose hold to avoid abrupt cone-length jumps."""
 

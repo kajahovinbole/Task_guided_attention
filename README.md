@@ -82,6 +82,8 @@ The script writes a side-by-side video and per-frame measurements to `results/re
 
 Set `use_reach_adaptive_heat = True` in `configs/full_pipeline.py` to enable it; the heat falloff range, signal weights, smoothing, and missing-pose hold are configurable there. The cone length remains `cone_length` for every frame.
 
+Cone width can also be adjusted independently with `use_person_scale_adaptive_cone`. When enabled, the pipeline estimates apparent torso size from the shoulder-to-hip distance in the frame and scales `cone_width` relative to `person_scale_reference_fraction`. A smaller apparent torso narrows the cone; `person_scale_min_width_factor` and `person_scale_max_width_factor` bound the adjustment. This is a perspective proxy and can also change when the person bends, turns, or is partly outside the frame. It is off by default.
+
 ### MediaPipe scripts
 
 The preferred MediaPipe pipeline to build on is `combining_holisitc_pose_hand.py`. Both this image-folder script and `scripts/full_pipeline.py` use the shared `VideoHandDetector` implementation in `src/video_hand_detector.py`. It combines Holistic pose/hand detections with the standalone Hand Landmarker and crop fallback, then selects final left/right hand landmarks. The image script uses MediaPipe image mode; the video pipeline uses video mode for frame-to-frame tracking. Its output folder is named after the input dataset folder. With the current input, the ensemble JSON, visualizations, fallback crops, scores, priors, and derived visualizations are grouped under `results/combined_holistic_pose_hand/1_2_3_andrea_merged/`:

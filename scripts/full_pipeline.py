@@ -31,6 +31,8 @@ from src.reach_estimator import (
     adaptive_heat_extent,
     make_reach_score,
     measure_arm,
+    measure_torso_fraction,
+    person_scale_width_factor,
 )
 from src.temporal_object_selector import TemporalObjectSelector
 from src.video_hand_detector import VideoHandDetector
@@ -69,7 +71,8 @@ def normalize_saliency(token_map):
 
 
 def create_focus_map(
-    model, frame_bgr, pointing_hand, device, config, heat_extent=None
+    model, frame_bgr, pointing_hand, device, config, heat_extent=None,
+    cone_width=None,
 ):
     """Create prior-conditioned focus, or bottom-up focus if no hand points."""
     height, width = frame_bgr.shape[:2]
@@ -100,7 +103,9 @@ def create_focus_map(
                     width,
                     height,
                     cone_length=config.cone_length,
-                    cone_width=config.cone_width,
+                    cone_width=(
+                        config.cone_width if cone_width is None else cone_width
+                    ),
                     cone_widening=config.cone_widening,
                     cone_near_ramp=config.cone_near_ramp,
                     longitudinal_decay_fraction=heat_extent,
@@ -225,6 +230,7 @@ def draw_verification_view(
     config,
     reach_score=None,
     heat_extent=None,
+    cone_width_factor=None,
 ):
     output = draw_saliency_overlay(
         frame.copy(), focus_map, config.heatmap_opacity
@@ -292,6 +298,17 @@ def draw_verification_view(
             output,
             f"REACH: {reach_text} | HEAT EXTENT: {extent_text}",
             (20, output.shape[0] - 45),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+    if cone_width_factor is not None:
+        cv2.putText(
+            output,
+            f"CONE WIDTH SCALE: {cone_width_factor:.2f}x",
+            (20, output.shape[0] - (75 if config.use_reach_adaptive_heat else 45)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.65,
             (255, 255, 255),
@@ -423,6 +440,9 @@ def run_full_pipeline(
                 reach_score_raw = None
                 reach_score_smoothed = None
                 heat_extent = None
+                torso_fraction = None
+                cone_width_factor = None
+                cone_width = config.cone_width
                 if config.use_reach_adaptive_heat:
                     arm_measurements = measure_arm(
                         hand_detector.last_pose_landmarks,
@@ -440,6 +460,20 @@ def run_full_pipeline(
                         config.reach_near_heat_extent,
                         config.reach_far_heat_extent,
                     )
+                if config.use_person_scale_adaptive_cone:
+                    torso_fraction = measure_torso_fraction(
+                        hand_detector.last_pose_landmarks,
+                        frame.shape[0],
+                        hand_detector.last_pose_visibility,
+                    )
+                    cone_width_factor = person_scale_width_factor(
+                        torso_fraction,
+                        config.person_scale_reference_fraction,
+                        config.person_scale_min_width_factor,
+                        config.person_scale_max_width_factor,
+                    )
+                    if cone_width_factor is not None:
+                        cone_width *= cone_width_factor
 
                 focus_small, focus_mode = create_focus_map(
                     abs_vit,
@@ -448,6 +482,7 @@ def run_full_pipeline(
                     device,
                     config,
                     heat_extent=heat_extent,
+                    cone_width=cone_width,
                 )
                 focus_map = resize_saliency(focus_small, frame.shape)
 
@@ -482,6 +517,7 @@ def run_full_pipeline(
                     config,
                     reach_score=reach_score_smoothed,
                     heat_extent=heat_extent,
+                    cone_width_factor=cone_width_factor,
                 )
                 selected_writer.write(selected_view)
                 verification_writer.write(verification_view)
@@ -505,6 +541,12 @@ def run_full_pipeline(
                     "reach_score_smoothed": reach_score_smoothed,
                     "cone_length": config.cone_length,
                     "heat_extent_fraction_of_cone": heat_extent,
+                    "person_scale_adaptive_cone_enabled": (
+                        config.use_person_scale_adaptive_cone
+                    ),
+                    "torso_fraction_of_frame_height": torso_fraction,
+                    "cone_width_factor": cone_width_factor,
+                    "cone_width": cone_width,
                     "selected_track_id": (
                         selected["track_id"] if selected else None
                     ),
