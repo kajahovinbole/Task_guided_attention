@@ -37,6 +37,16 @@ The prior experiment uses a separately trained/configured patch-8 GAP checkpoint
 
 Run commands from the repository root. Local datasets and checkpoints must exist at the paths described below.
 
+### Experiment with reach-adaptive cone length
+
+Before changing the full pipeline, compare a fixed cone with a cone whose length is scaled from 2D elbow and shoulder/torso pose angles:
+
+```bash
+uv run python scripts/experiment_reach_adaptive_cone.py path/to/reach_video.mov --show
+```
+
+The script writes a side-by-side video and per-frame measurements to `results/reach_cone_experiment/<video-name>/`. The reach score is an experimental 2D pose proxy, not a calibrated distance estimate. This experiment uses Holistic's pose and hand landmarks directly; it tests the reach cue, not the combined hand-detector fallback. Adjust `--min-cone-length`, `--max-cone-length`, `--elbow-weight`, `--shoulder-weight`, and `--score-alpha` to compare mappings. The production video pipeline is not changed by this experiment.
+
 ### MediaPipe scripts
 
 The preferred MediaPipe pipeline to build on is `combining_holisitc_pose_hand.py`. It combines Holistic pose/hand detections with the standalone Hand Landmarker and crop fallback, then selects final left/right hand landmarks. Its output folder is named after the input dataset folder. With the current input, the ensemble JSON, visualizations, fallback crops, scores, priors, and derived visualizations are grouped under `results/combined_holistic_pose_hand/1_2_3_andrea_merged/`:

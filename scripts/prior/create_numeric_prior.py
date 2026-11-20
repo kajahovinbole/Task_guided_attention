@@ -23,14 +23,20 @@ CONE_WIDENING = 0.12
 CONE_NEAR_RAMP = 0.05
 
 
-def create_cone_heatmap(tip, direction, width, height):
+def create_cone_heatmap(
+    tip,
+    direction,
+    width,
+    height,
+    cone_length_fraction=CONE_LENGTH,
+):
     """Returnerer en numerisk heatmap med verdier i [0, 1]."""
 
     tip_x, tip_y = tip[0] * width, tip[1] * height
     dx, dy = direction
 
     diagonal = np.hypot(width, height)
-    cone_length = CONE_LENGTH * diagonal
+    cone_length = cone_length_fraction * diagonal
     sigma_start = CONE_WIDTH * diagonal
 
     yy, xx = np.mgrid[0:height, 0:width]
