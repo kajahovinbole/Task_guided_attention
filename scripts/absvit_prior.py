@@ -6,9 +6,6 @@ models.AbSViT og scripts.create_numeric_prior.
 from pathlib import Path
 import sys
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -20,7 +17,13 @@ if str(ROOT) not in sys.path:
 
 from models.AbSViT.absvit import absvit_tiny_patch8_224_gap
 #from models.AbSViT.absvit import absvit_tiny_patch16_224
-from scripts.prior.create_numeric_prior import create_cone_heatmap
+from scripts.prior.create_numeric_prior import (
+    CONE_LENGTH,
+    CONE_NEAR_RAMP,
+    CONE_WIDENING,
+    CONE_WIDTH,
+    create_cone_heatmap,
+)
 
 
 # --------------------------------------------------
@@ -51,20 +54,64 @@ MEAN = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
 STD = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
 
 
+def preprocess_rgb(rgb):
+    """Convert an RGB frame/array to normalized AbSViT input [1,3,224,224]."""
+    image = Image.fromarray(np.asarray(rgb, dtype=np.uint8)).convert("RGB")
+    resized = image.resize((IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BICUBIC)
+    array = np.asarray(resized).copy()
+    tensor = torch.from_numpy(array).permute(2, 0, 1).float() / 255.0
+    return ((tensor - MEAN) / STD).unsqueeze(0)
+
+
 def load_image(path):
     """Returnerer (normalisert [1,3,224,224], RGB-array, (W,H))."""
     image = Image.open(path).convert("RGB")
-    resized = image.resize((IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BICUBIC)
-    rgb = np.asarray(resized).copy()
-    tensor = torch.from_numpy(rgb).permute(2, 0, 1).float() / 255.0
-    return ((tensor - MEAN) / STD).unsqueeze(0), rgb, image.size
+    rgb = np.asarray(image.resize(
+        (IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BICUBIC
+    )).copy()
+    return preprocess_rgb(np.asarray(image)), rgb, image.size
 
 
-def make_patch_prior(tip, direction, image_w, image_h):
+def load_abs_vit_model(checkpoint_path, device="cpu"):
+    """Load the patch-8 GAP model and checkpoint used by this workflow."""
+    checkpoint_path = Path(checkpoint_path)
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(
+            f"Fant ikke AbSViT patch-8 GAP-checkpoint: {checkpoint_path}"
+        )
+    model = absvit_tiny_patch8_224_gap(pretrained=False)
+    checkpoint = torch.load(
+        checkpoint_path, map_location="cpu", weights_only=False
+    )
+    model.load_state_dict(checkpoint.get("model", checkpoint))
+    model.to(device)
+    model.eval()
+    return model
+
+
+def make_patch_prior(
+    tip,
+    direction,
+    image_w,
+    image_h,
+    cone_length=CONE_LENGTH,
+    cone_width=CONE_WIDTH,
+    cone_widening=CONE_WIDENING,
+    cone_near_ramp=CONE_NEAR_RAMP,
+):
     """Lag pekekjegle med originalt sideforhold, resample til ViT-grid."""
     small_w = 448
     small_h = round(small_w * image_h / image_w)
-    heatmap = create_cone_heatmap(tip, direction, small_w, small_h)
+    heatmap = create_cone_heatmap(
+        tip,
+        direction,
+        small_w,
+        small_h,
+        cone_length_fraction=cone_length,
+        cone_width_fraction=cone_width,
+        cone_widening=cone_widening,
+        near_ramp_fraction=cone_near_ramp,
+    )
     heatmap = torch.as_tensor(heatmap, dtype=torch.float32)[None, None]
     heatmap = F.interpolate(
         heatmap, size=(IMAGE_SIZE, IMAGE_SIZE),
@@ -74,24 +121,34 @@ def make_patch_prior(tip, direction, image_w, image_h):
     return heatmap[0, 0], patch_prior
 
 
-def prior_to_mask(patch_prior, num_prefix_tokens):
-    """[14,14] -> [1,197,1] når modellen har ett CLS-token."""
+def prior_to_mask(
+    patch_prior,
+    num_prefix_tokens,
+    prior_scale=PRIOR_SCALE,
+    cls_prior=CLS_PRIOR,
+):
+    """Convert a patch grid to a broadcastable token prior."""
     patches = patch_prior.flatten()
     max_value = patches.max().item()
     if max_value > 0:
-        patches = patches / max_value * PRIOR_SCALE
+        patches = patches / max_value * prior_scale
     else:
         patches = torch.zeros_like(patches)
     prefix = torch.full(
-        (num_prefix_tokens,), CLS_PRIOR, dtype=patches.dtype,
+        (num_prefix_tokens,), cls_prior, dtype=patches.dtype,
         device=patches.device,
     )
     return torch.cat([prefix, patches], dim=0)[None, :, None]
 
 
-def get_token_norm_map(model, image_tensor, td=None):
+def get_token_norm_map(
+    model,
+    image_tensor,
+    td=None,
+    attention_layer_from_end=ATTENTION_LAYER_FROM_END,
+):
     """Token-norm i et mellomliggende ViT-lag, ikke QK attention-vekter."""
-    layer = len(model.blocks) - ATTENTION_LAYER_FROM_END
+    layer = len(model.blocks) - attention_layer_from_end
     if not (1 <= layer <= len(model.blocks)):
         raise ValueError("Ugyldig ATTENTION_LAYER_FROM_END")
 
@@ -105,10 +162,21 @@ def get_token_norm_map(model, image_tensor, td=None):
     return norms.reshape(side, side)
 
 
-def run_pointing(model, image_tensor, features, pointing_mask):
+def run_pointing(
+    model,
+    image_tensor,
+    features,
+    pointing_mask,
+    attention_layer_from_end=ATTENTION_LAYER_FROM_END,
+):
     """Lag top-down feedback fra pekeprioren og returner token-norm i andre pass."""
     td = model.feedback(features * pointing_mask * model.feedback_aug)
-    return get_token_norm_map(model, image_tensor, td)
+    return get_token_norm_map(
+        model,
+        image_tensor,
+        td,
+        attention_layer_from_end=attention_layer_from_end,
+    )
 
 
 def mass_in_prior(token_norm_map, patch_prior):
@@ -128,6 +196,10 @@ def find_image(stem):
 
 
 def main():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     if not CHECKPOINT.is_file():
         raise FileNotFoundError(
             f"Fant ikke AbSViT patch-8 checkpoint: {CHECKPOINT}. "
@@ -140,10 +212,7 @@ def main():
     MAPS_DIR.mkdir(parents=True, exist_ok=True)
 
     #model = absvit_tiny_patch16_224(pretrained=False)
-    model = absvit_tiny_patch8_224_gap(pretrained=False)
-    checkpoint = torch.load(CHECKPOINT, map_location="cpu", weights_only=False)
-    model.load_state_dict(checkpoint.get("model", checkpoint))
-    model.eval()
+    model = load_abs_vit_model(CHECKPOINT)
 
     print(f"{'bilde':<28} {'tilfeldig':>9} {'bottom-up':>10} {'peking':>9}")
     all_masses = []
