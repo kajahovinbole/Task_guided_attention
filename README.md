@@ -78,7 +78,7 @@ Compare the fixed cone with a cone scaled from arm reach before enabling the opt
 uv run python scripts/experiment_reach_adaptive_cone.py path/to/reach_video.mov --show
 ```
 
-The script writes a side-by-side video and per-frame measurements to `results/reach_cone_experiment/<video-name>/`. It uses the same combined hand detector and reach-measurement functions as the full pipeline. The reach score is a 2D pose proxy, not a calibrated distance estimate. Adjust `--min-cone-length`, `--max-cone-length`, `--elbow-weight`, `--shoulder-weight`, and `--score-alpha` to compare mappings.
+The script writes a side-by-side video and per-frame measurements to `results/reach_cone_experiment/<video-name>/`. It uses the same combined hand detector and reach-measurement functions as the full pipeline. The reach score is an experimental 2D pose proxy, not a calibrated distance estimate. Adjust `--min-cone-length`, `--max-cone-length`, `--elbow-weight`, `--shoulder-weight`, and `--score-alpha` to compare mappings.
 
 Reach adaptation is off by default in the full pipeline. Set `use_reach_adaptive_cone = True` in `configs/full_pipeline.py` to enable it; the range, signal weights, smoothing, and missing-pose hold are configurable there.
 

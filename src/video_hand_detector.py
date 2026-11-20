@@ -219,6 +219,10 @@ class VideoHandDetector:
         self.last_pose_landmarks = (
             self._to_pixels(pose, width, height) if pose else None
         )
+        self.last_pose_visibility = (
+            [float(getattr(point, "visibility", 1.0)) for point in pose]
+            if pose else None
+        )
         for side in ("left", "right"):
             normalized = getattr(holistic, f"{side}_hand_landmarks", None)
             holistic_hands[side] = (

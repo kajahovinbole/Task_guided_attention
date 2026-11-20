@@ -45,6 +45,15 @@ class PipelineConfig:
     cone_widening: float = 0.12
     cone_near_ramp: float = 0.05
 
+    # Optional arm-reach proxy for per-frame cone length
+    use_reach_adaptive_cone: bool = False
+    reach_min_cone_length: float = 0.20
+    reach_max_cone_length: float = 0.60
+    reach_elbow_weight: float = 0.70
+    reach_shoulder_weight: float = 0.30
+    reach_score_alpha: float = 0.35
+    reach_score_hold_missing_frames: int = 3
+
     # AbSViT prior and focus-map settings
     prior_scale: float = 25.0
     cls_prior: float = 0.0
@@ -85,6 +94,16 @@ class PipelineConfig:
             raise ValueError("heatmap_opacity må være mellom 0 og 1.")
         if self.yolo_image_size <= 0 or self.hand_crop_size <= 0:
             raise ValueError("Bildestørrelse og crop-størrelse må være positive.")
+        if not 0 < self.reach_min_cone_length <= self.reach_max_cone_length:
+            raise ValueError("Reach cone lengths must satisfy 0 < min <= max.")
+        if self.reach_elbow_weight < 0 or self.reach_shoulder_weight < 0:
+            raise ValueError("Reach score weights cannot be negative.")
+        if self.reach_elbow_weight + self.reach_shoulder_weight <= 0:
+            raise ValueError("At least one reach score weight must be positive.")
+        if not 0.0 < self.reach_score_alpha <= 1.0:
+            raise ValueError("reach_score_alpha must be in (0, 1].")
+        if self.reach_score_hold_missing_frames < 0:
+            raise ValueError("reach_score_hold_missing_frames cannot be negative.")
 
 
 DEFAULT_CONFIG = PipelineConfig()

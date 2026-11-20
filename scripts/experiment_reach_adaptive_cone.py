@@ -2,7 +2,7 @@
 
 This is deliberately separate from the production video pipeline. It uses
 2D pose landmarks to inspect whether elbow and shoulder angles are useful
-proxies for near/far pointing before the cone is changed in full_pipeline.py.
+proxies for near/far pointing and compare fixed/adaptive cone lengths.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from pathlib import Path
 import sys
 
 import cv2
-import mediapipe as mp
 import numpy as np
 
 
@@ -28,63 +27,13 @@ from scripts.prior.create_numeric_prior import (
     get_pointing_data,
 )
 from scripts.prior.score_pointing_hand import score_pointing_hand
-
-
-POSE_IDS = {
-    "left": {"shoulder": 11, "elbow": 13, "wrist": 15, "hip": 23},
-    "right": {"shoulder": 12, "elbow": 14, "wrist": 16, "hip": 24},
-}
-
-
-class HolisticVideoDetector:
-    """Run Holistic in video mode and expose pose plus both hand landmark sets."""
-
-    def __init__(self, model_path):
-        if not model_path.is_file():
-            raise FileNotFoundError(f"Fant ikke MediaPipe-modellen: {model_path}")
-        vision = mp.tasks.vision
-        options = vision.HolisticLandmarkerOptions(
-            base_options=mp.tasks.BaseOptions(model_asset_path=str(model_path)),
-            running_mode=vision.RunningMode.VIDEO,
-            min_pose_detection_confidence=0.3,
-            min_pose_landmarks_confidence=0.3,
-            min_hand_landmarks_confidence=0.3,
-        )
-        self.model = vision.HolisticLandmarker.create_from_options(options)
-        self.last_pose_landmarks = None
-        self.last_pose_visibility = None
-
-    @staticmethod
-    def _pixels(landmarks, width, height):
-        if not landmarks:
-            return None
-        return [
-            {"x": int(point.x * width), "y": int(point.y * height)}
-            for point in landmarks
-        ]
-
-    def detect(self, frame_bgr, timestamp_ms):
-        height, width = frame_bgr.shape[:2]
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        result = self.model.detect_for_video(image, timestamp_ms)
-        pose = result.pose_landmarks
-        self.last_pose_landmarks = self._pixels(pose, width, height)
-        self.last_pose_visibility = (
-            [float(getattr(point, "visibility", 1.0)) for point in pose]
-            if pose else None
-        )
-        hands = []
-        for side in ("left", "right"):
-            points = self._pixels(
-                getattr(result, f"{side}_hand_landmarks", None), width, height
-            )
-            if points:
-                hands.append({"side": side, "landmarks": points})
-        return hands
-
-    def close(self):
-        self.model.close()
+from src.reach_estimator import (
+    ReachScoreSmoother,
+    adaptive_cone_length,
+    make_reach_score,
+    measure_arm,
+)
+from src.video_hand_detector import VideoHandDetector
 
 
 def parse_source(value):
@@ -145,70 +94,6 @@ def build_parser():
     return parser
 
 
-def _distance(point_a, point_b):
-    return float(np.linalg.norm(np.asarray(point_a) - np.asarray(point_b)))
-
-
-def _angle_degrees(point_a, vertex, point_b):
-    """Return the smaller 2D angle at vertex in the range [0, 180]."""
-    a = np.asarray(point_a, dtype=float) - np.asarray(vertex, dtype=float)
-    b = np.asarray(point_b, dtype=float) - np.asarray(vertex, dtype=float)
-    denominator = np.linalg.norm(a) * np.linalg.norm(b)
-    if denominator < 1e-8:
-        return None
-    cosine = np.clip(np.dot(a, b) / denominator, -1.0, 1.0)
-    return float(np.degrees(np.arccos(cosine)))
-
-
-def measure_arm(pose_landmarks, side, pose_visibility=None):
-    """Measure elbow and shoulder/torso angles from pixel pose landmarks."""
-    if side not in POSE_IDS or pose_landmarks is None:
-        return None
-    ids = POSE_IDS[side]
-    if len(pose_landmarks) <= max(ids.values()):
-        return None
-    if pose_visibility is not None and any(
-        pose_visibility[index] < 0.1 for index in ids.values()
-    ):
-        return None
-
-    points = {
-        name: np.array(
-            [pose_landmarks[index]["x"], pose_landmarks[index]["y"]],
-            dtype=float,
-        )
-        for name, index in ids.items()
-    }
-    elbow_angle = _angle_degrees(
-        points["shoulder"], points["elbow"], points["wrist"]
-    )
-    shoulder_torso_angle = _angle_degrees(
-        points["hip"], points["shoulder"], points["elbow"]
-    )
-    torso_length = _distance(points["shoulder"], points["hip"])
-    shoulder_wrist_ratio = (
-        _distance(points["shoulder"], points["wrist"]) / torso_length
-        if torso_length > 1e-6 else None
-    )
-
-    if elbow_angle is None or shoulder_torso_angle is None:
-        return None
-
-    # Map 90..180 degrees of elbow opening and 15..90 degrees of arm lift
-    # to [0,1]. These are experiment defaults, not calibrated thresholds.
-    elbow_extension = float(np.clip((elbow_angle - 90.0) / 90.0, 0.0, 1.0))
-    shoulder_extension = float(
-        np.clip((shoulder_torso_angle - 15.0) / 75.0, 0.0, 1.0)
-    )
-    return {
-        "elbow_angle_degrees": elbow_angle,
-        "shoulder_torso_angle_degrees": shoulder_torso_angle,
-        "shoulder_wrist_to_torso_ratio": shoulder_wrist_ratio,
-        "elbow_extension_score": elbow_extension,
-        "shoulder_extension_score": shoulder_extension,
-    }
-
-
 def choose_hand(hands):
     """Return the highest hand-shape score, even when below pointing threshold."""
     scored = []
@@ -218,18 +103,6 @@ def choose_hand(hands):
         hand["pointing_components"] = score["components"]
         scored.append(hand)
     return max(scored, key=lambda hand: hand["pointing_score"]) if scored else None
-
-
-def make_reach_score(arm_measurements, elbow_weight, shoulder_weight):
-    if arm_measurements is None:
-        return None
-    weight_total = elbow_weight + shoulder_weight
-    if weight_total <= 0:
-        return None
-    return (
-        elbow_weight * arm_measurements["elbow_extension_score"]
-        + shoulder_weight * arm_measurements["shoulder_extension_score"]
-    ) / weight_total
 
 
 def make_cone(tip, direction, width, height, length):
@@ -325,13 +198,13 @@ def run_experiment(args):
     fps = float(capture.get(cv2.CAP_PROP_FPS))
     if not math.isfinite(fps) or fps <= 0:
         fps = 30.0
-    detector = HolisticVideoDetector(
-        ROOT / "models" / "mediapipe" / "holistic_landmarker.task"
-    )
+    detector = VideoHandDetector(ROOT / "models" / "mediapipe")
     writer = None
     frame_index = 0
     last_timestamp_ms = -1
-    smooth_reach_score = None
+    reach_smoother = ReachScoreSmoother(
+        alpha=args.score_alpha, missing_hold_frames=0
+    )
     try:
         with records_path.open("w", encoding="utf-8") as records:
             records.write(json.dumps({
@@ -381,20 +254,12 @@ def run_experiment(args):
                 raw_reach_score = make_reach_score(
                     arm, args.elbow_weight, args.shoulder_weight
                 )
-                if raw_reach_score is None:
-                    smooth_reach_score = None
-                    adaptive_length = None
-                else:
-                    smooth_reach_score = (
-                        raw_reach_score if smooth_reach_score is None else
-                        args.score_alpha * raw_reach_score
-                        + (1.0 - args.score_alpha) * smooth_reach_score
-                    )
-                    adaptive_length = (
-                        args.min_cone_length
-                        + smooth_reach_score
-                        * (args.max_cone_length - args.min_cone_length)
-                    )
+                smooth_reach_score = reach_smoother.update(raw_reach_score)
+                adaptive_length = adaptive_cone_length(
+                    smooth_reach_score,
+                    args.min_cone_length,
+                    args.max_cone_length,
+                )
 
                 pointing = None
                 if (

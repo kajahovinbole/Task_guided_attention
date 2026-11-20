@@ -26,6 +26,12 @@ from scripts.prior.score_pointing_hand import (
 )
 from scripts.yolo_detection import detect_objects, load_yolo_model
 from configs.full_pipeline import DEFAULT_CONFIG, PipelineConfig
+from src.reach_estimator import (
+    ReachScoreSmoother,
+    adaptive_cone_length,
+    make_reach_score,
+    measure_arm,
+)
 from src.temporal_object_selector import TemporalObjectSelector
 from src.video_hand_detector import VideoHandDetector
 
@@ -62,7 +68,9 @@ def normalize_saliency(token_map):
     return ((values - minimum) / (maximum - minimum)).astype(np.float32)
 
 
-def create_focus_map(model, frame_bgr, pointing_hand, device, config):
+def create_focus_map(
+    model, frame_bgr, pointing_hand, device, config, cone_length=None
+):
     """Create prior-conditioned focus, or bottom-up focus if no hand points."""
     height, width = frame_bgr.shape[:2]
     image_tensor = prepare_frame_tensor(frame_bgr, device)
@@ -91,7 +99,9 @@ def create_focus_map(model, frame_bgr, pointing_hand, device, config):
                     direction,
                     width,
                     height,
-                    cone_length=config.cone_length,
+                    cone_length=(
+                        config.cone_length if cone_length is None else cone_length
+                    ),
                     cone_width=config.cone_width,
                     cone_widening=config.cone_widening,
                     cone_near_ramp=config.cone_near_ramp,
@@ -214,6 +224,8 @@ def draw_verification_view(
     focus_map,
     focus_mode,
     config,
+    reach_score=None,
+    cone_length=None,
 ):
     output = draw_saliency_overlay(
         frame.copy(), focus_map, config.heatmap_opacity
@@ -274,6 +286,19 @@ def draw_verification_view(
         2,
         cv2.LINE_AA,
     )
+    if config.use_reach_adaptive_cone:
+        reach_text = "n/a" if reach_score is None else f"{reach_score:.2f}"
+        length_text = "n/a" if cone_length is None else f"{cone_length:.3f}"
+        cv2.putText(
+            output,
+            f"REACH: {reach_text} | CONE LENGTH: {length_text}",
+            (20, output.shape[0] - 45),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
     return output
 
 
@@ -330,6 +355,10 @@ def run_full_pipeline(
         match_iou_threshold=config.track_match_iou_threshold,
         max_missing_frames=config.track_max_missing_frames,
         selected_missing_grace_frames=config.selected_missing_grace_frames,
+    )
+    reach_smoother = ReachScoreSmoother(
+        alpha=config.reach_score_alpha,
+        missing_hold_frames=config.reach_score_hold_missing_frames,
     )
 
     capture = cv2.VideoCapture(source)
@@ -391,8 +420,37 @@ def run_full_pipeline(
                 pointing_hand = _pointing_hands(
                     hands, config.min_pointing_score
                 )
+                arm_measurements = None
+                reach_score_raw = None
+                reach_score_smoothed = None
+                cone_length = config.cone_length
+                if config.use_reach_adaptive_cone:
+                    arm_measurements = measure_arm(
+                        hand_detector.last_pose_landmarks,
+                        pointing_hand["side"] if pointing_hand else None,
+                        hand_detector.last_pose_visibility,
+                    )
+                    reach_score_raw = make_reach_score(
+                        arm_measurements,
+                        config.reach_elbow_weight,
+                        config.reach_shoulder_weight,
+                    )
+                    reach_score_smoothed = reach_smoother.update(reach_score_raw)
+                    adaptive_length = adaptive_cone_length(
+                        reach_score_smoothed,
+                        config.reach_min_cone_length,
+                        config.reach_max_cone_length,
+                    )
+                    if adaptive_length is not None:
+                        cone_length = adaptive_length
+
                 focus_small, focus_mode = create_focus_map(
-                    abs_vit, frame, pointing_hand, device, config
+                    abs_vit,
+                    frame,
+                    pointing_hand,
+                    device,
+                    config,
+                    cone_length=cone_length,
                 )
                 focus_map = resize_saliency(focus_small, frame.shape)
 
@@ -425,6 +483,8 @@ def run_full_pipeline(
                     focus_map,
                     focus_mode,
                     config,
+                    reach_score=reach_score_smoothed,
+                    cone_length=cone_length,
                 )
                 selected_writer.write(selected_view)
                 verification_writer.write(verification_view)
@@ -442,6 +502,11 @@ def run_full_pipeline(
                         if pointing_hand else None
                     ),
                     "focus_mode": focus_mode,
+                    "reach_adaptive_cone_enabled": config.use_reach_adaptive_cone,
+                    "arm_measurements": arm_measurements,
+                    "reach_score_raw": reach_score_raw,
+                    "reach_score_smoothed": reach_score_smoothed,
+                    "cone_length": cone_length,
                     "selected_track_id": (
                         selected["track_id"] if selected else None
                     ),
