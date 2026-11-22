@@ -27,10 +27,10 @@ class PipelineConfig:
     hand_agreement_threshold: float = 0.08
 
     # YOLO detections and object-selection signal weights
-    yolo_inference_confidence: float = 0.3
+    yolo_inference_confidence: float = 0.25
     min_yolo_confidence: float = 0.25
-    saliency_weight: float = 0.80
-    yolo_confidence_weight: float = 0.20
+    saliency_weight: float = 1
+    yolo_confidence_weight: float = 0
     score_smoothing_alpha: float = 0.35     #lavere verdi gir mer smoothing
     bbox_smoothing_alpha: float = 0.45
     track_switch_margin: float = 0.08
