@@ -160,7 +160,7 @@ def main():
             tip, direction = pointing
             output_name = f"{image_name}_hand_{hand_index}"
 
-            # Bare pekingen lagres. Kjeglen lages i test_absvit_prior.py,
+            # Bare pekingen lagres. Kjeglen lages i absvit_prior.py,
             # med riktig sideforhold og rutenett for modellen som brukes.
             np.savez_compressed(
                 OUTPUT_DIR / f"{output_name}.npz",

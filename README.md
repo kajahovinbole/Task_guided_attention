@@ -82,6 +82,12 @@ uv run scripts/absvit_prior.py
 uv run scripts/evaluate_focus_bbox.py
 ```
 
+The shared experiment settings are in `configs/absvit_prior_experiment.py`.
+Change `RUN_NAME` there to keep separate outputs for different runs; reusing a
+name overwrites that run's outputs. The prior grid is derived from the loaded
+model's patch embedding, and evaluation uses the saved grid dimensions rather
+than an independent patch-size setting.
+
 ### Full-pipeline object-selection evaluation
 
 `scripts/evaluate_pipeline_bbox.py` evaluates whether the complete

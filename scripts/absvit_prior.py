@@ -1,7 +1,7 @@
 """Sammenlign bottom-up ViT med AbSViT styrt av en spatial pekeprior.
 
-Ingen prompt-prior brukes. Skriptet bruker prosjektets eksisterende
-models.AbSViT og scripts.create_numeric_prior.
+Ingen prompt-prior brukes. Skriptet bruker prosjektets eksisterende AbSViT
+modell og scripts.prior.create_numeric_prior.
 """
 from pathlib import Path
 import sys
@@ -17,6 +17,18 @@ if str(ROOT) not in sys.path:
 
 from models.AbSViT.absvit import absvit_tiny_patch8_224_gap
 #from models.AbSViT.absvit import absvit_tiny_patch16_224
+from configs.absvit_prior_experiment import (
+    ABSVIT_OUTPUT_DIR as OUTPUT_DIR,
+    ATTENTION_LAYER_FROM_END,
+    CHECKPOINT,
+    CLS_PRIOR,
+    IMAGE_DIR,
+    IMAGE_SIZE,
+    MAPS_DIR,
+    PRIOR_DIR,
+    PRIOR_SCALE,
+    RUN_NAME,
+)
 from scripts.prior.create_numeric_prior import (
     CONE_LENGTH,
     CONE_NEAR_RAMP,
@@ -25,30 +37,6 @@ from scripts.prior.create_numeric_prior import (
     create_cone_heatmap,
 )
 
-
-# --------------------------------------------------
-# Innstillinger
-# --------------------------------------------------
-DATA_DIR = ROOT / "data" / "funker_bra_20okt"
-IMAGE_DIR = DATA_DIR / "imgs"
-ENSEMBLE_RUN_NAME = "1_2_3_andrea_merged"
-ENSEMBLE_RUN_DIR = ROOT / "results" / "combined_holistic_pose_hand" / ENSEMBLE_RUN_NAME
-PRIOR_DIR = ENSEMBLE_RUN_DIR / "numeric_pointing_prior"
-CHECKPOINT = ROOT / "checkpoints" / "absvit_tiny_patch8_224_gap.pth"
-OUTPUT_DIR = ROOT / "results" / "absvit_prior_test_28x28_lay9"
-# Kartene lagres her slik at evaluate_focus_bbox.py kan bruke dem.
-MAPS_DIR = OUTPUT_DIR / "maps"
-
-IMAGE_SIZE = 224
-PATCH_SIZE = 8
-
-# Valgt fra tidligere sveip. Bør senere valideres mot objektlokalisering,
-# ikke bare andelen token-norm inne i den geometriske kjeglen.
-PRIOR_SCALE = 25.0
-CLS_PRIOR = 0.0
-
-# Antall lag fra slutten til laget hvor token-normen visualiseres.
-ATTENTION_LAYER_FROM_END = 3
 
 MEAN = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
 STD = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
@@ -90,6 +78,7 @@ def load_abs_vit_model(checkpoint_path, device="cpu"):
 
 
 def make_patch_prior(
+    model,
     tip,
     direction,
     image_w,
@@ -119,7 +108,14 @@ def make_patch_prior(
         heatmap, size=(IMAGE_SIZE, IMAGE_SIZE),
         mode="bilinear", align_corners=False,
     )
-    patch_prior = F.avg_pool2d(heatmap, PATCH_SIZE)[0, 0]
+    patch_prior = F.avg_pool2d(
+        heatmap, kernel_size=model.patch_embed.patch_size
+    )[0, 0]
+    if patch_prior.numel() != model.patch_embed.num_patches:
+        raise ValueError(
+            f"Prior grid has {patch_prior.numel()} patches, but the model "
+            f"expects {model.patch_embed.num_patches}. Check image and model sizes."
+        )
     return heatmap[0, 0], patch_prior
 
 
@@ -232,7 +228,9 @@ def main():
             direction = data["direction"]
 
         x, rgb, (image_w, image_h) = load_image(image_path)
-        heatmap, patch_prior = make_patch_prior(tip, direction, image_w, image_h)
+        heatmap, patch_prior = make_patch_prior(
+            model, tip, direction, image_w, image_h
+        )
         pointing_mask = prior_to_mask(patch_prior, model.num_prefix_tokens)
 
         with torch.no_grad():
@@ -263,6 +261,18 @@ def main():
             patch_prior=patch_prior.numpy(),
             baseline_map=baseline_map.numpy(),
             pointing_map=pointing_map.numpy(),
+            run_name=RUN_NAME,
+            image_size=IMAGE_SIZE,
+            model_patch_size=np.asarray(model.patch_embed.patch_size),
+            patch_grid_shape=np.asarray(patch_prior.shape),
+            prior_scale=PRIOR_SCALE,
+            cls_prior=CLS_PRIOR,
+            attention_layer_from_end=ATTENTION_LAYER_FROM_END,
+            checkpoint=CHECKPOINT.name,
+            cone_length=CONE_LENGTH,
+            cone_width=CONE_WIDTH,
+            cone_widening=CONE_WIDENING,
+            cone_near_ramp=CONE_NEAR_RAMP,
         )
 
         fig, axes = plt.subplots(1, 3, figsize=(14, 5))

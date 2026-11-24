@@ -98,6 +98,7 @@ def create_focus_map(
             else:
                 tip, direction = pointing
                 _, patch_prior = make_patch_prior(
+                    model,
                     tip,
                     direction,
                     width,

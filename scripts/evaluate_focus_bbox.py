@@ -1,9 +1,8 @@
 """Mål på hvor mye av fokuset som havner innenfor fasit-boksen.
 
-Leser kartene som absvit_prior.py lagrer i
-results/absvit_prior_test_28x28_lay9/maps/
-og boksene i data/funker_bra_20okt/labels.json (COCO: [x, y, bredde,
-høyde] i originalpiksler).
+Leser kartene som absvit_prior.py lagrer, og boksene i
+data/funker_bra_20okt/labels.json (COCO: [x, y, bredde, høyde] i
+originalpiksler).
 
 For hvert bilde regnes ut:
   - tilfeldig  : boksens andel av bildet (forventet verdi ved jevnt fokus)
@@ -17,6 +16,7 @@ Kjør absvit_prior.py først, deretter:  uv run scripts/evaluate_focus_bbox.py
 from pathlib import Path
 import csv
 import json
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -29,14 +29,16 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-LABELS_PATH = ROOT / "data" / "funker_bra_20okt" / "labels.json"
-IMAGE_DIR = ROOT / "data" / "funker_bra_20okt" / "imgs"
-MAPS_DIR = ROOT / "results" / "absvit_prior_test_28x28_lay9" / "maps"
-OUTPUT_DIR = ROOT / "results" / "bbox_eval_28x28_lay9"
-
-IMAGE_SIZE = 224
-PATCH_SIZE = 8 #16
+from configs.absvit_prior_experiment import (
+    FOCUS_BBOX_OUTPUT_DIR as OUTPUT_DIR,
+    IMAGE_DIR,
+    IMAGE_SIZE,
+    LABELS_PATH,
+    MAPS_DIR,
+)
 
 
 def load_boxes():
@@ -53,15 +55,18 @@ def box_to_224(bbox, image_w, image_h):
     return x * sx, y * sy, w * sx, h * sy
 
 
-def box_masks(box_224):
-    """Pikselmaske 224x224 og andel av hver patch som dekkes av boksen (14x14)."""
+def box_masks(box_224, grid_shape):
+    """Return pixel mask and fractional box coverage for the saved token grid."""
     x, y, w, h = box_224
     xx = np.arange(IMAGE_SIZE) + 0.5
     inside_x = (xx >= x) & (xx <= x + w)
     inside_y = (xx >= y) & (xx <= y + h)
     pixel_mask = (inside_y[:, None] & inside_x[None, :]).astype(np.float32)
 
-    coverage = F.avg_pool2d(torch.from_numpy(pixel_mask)[None, None], PATCH_SIZE)[0, 0]
+    coverage = F.adaptive_avg_pool2d(
+        torch.from_numpy(pixel_mask)[None, None],
+        output_size=grid_shape,
+    )[0, 0]
     return pixel_mask, coverage.numpy()
 
 
@@ -91,7 +96,7 @@ def main():
 
     map_paths = sorted(MAPS_DIR.glob("*.npz"))
     if not map_paths:
-        print(f"Fant ingen kart i {MAPS_DIR}. Kjør test_absvit_prior.py først.")
+        print(f"Fant ingen kart i {MAPS_DIR}. Kjør scripts/absvit_prior.py først.")
         return
 
     rows = []
@@ -108,6 +113,15 @@ def main():
             heatmap = data["heatmap_224"]
             baseline_map = data["baseline_map"]
             pointing_map = data["pointing_map"]
+            patch_prior = data["patch_prior"]
+
+        if baseline_map.shape != pointing_map.shape:
+            raise ValueError(f"Ulike fokus-grid i {map_path}")
+        if baseline_map.shape != patch_prior.shape:
+            raise ValueError(
+                f"Fokus-grid {baseline_map.shape} og prior-grid "
+                f"{patch_prior.shape} stemmer ikke i {map_path}"
+            )
 
         image_stem = Path(image_name).stem
         if image_stem not in boxes:
@@ -115,7 +129,7 @@ def main():
             continue
 
         box_224 = box_to_224(boxes[image_stem], image_w, image_h)
-        pixel_mask, coverage = box_masks(box_224)
+        pixel_mask, coverage = box_masks(box_224, baseline_map.shape)
 
         random_fraction = float(pixel_mask.mean())
         cone_fraction = float((heatmap * pixel_mask).sum() / max(heatmap.sum(), 1e-12))
@@ -165,8 +179,12 @@ def main():
             )
             # Markér patchen med sterkest fokus.
             row, col = np.unravel_index(np.argmax(token_map), token_map.shape)
+            grid_height, grid_width = token_map.shape
+            cell_width = IMAGE_SIZE / grid_width
+            cell_height = IMAGE_SIZE / grid_height
             ax.add_patch(Rectangle(
-                (col * PATCH_SIZE, row * PATCH_SIZE), PATCH_SIZE, PATCH_SIZE,
+                (col * cell_width, row * cell_height),
+                cell_width, cell_height,
                 fill=False, edgecolor="white", linewidth=2, linestyle="--",
             ))
             ax.set_title(
