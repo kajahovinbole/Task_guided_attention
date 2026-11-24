@@ -19,8 +19,8 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 IMAGE_DIR = ROOT / "data" / "funker_bra_20okt" / "imgs"
-MAPS_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9_s25" / "maps"
-OUTPUT_DIR = ROOT / "data" / "results" / "prior_images"
+MAPS_DIR = ROOT / "results" / "absvit_prior_test_28x28_lay9" / "maps"
+OUTPUT_DIR = ROOT / "results" / "prior_images"
 
 IMAGE_SIZE = 224
 CONE_ALPHA = 0.45

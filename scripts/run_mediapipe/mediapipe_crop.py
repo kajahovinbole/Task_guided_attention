@@ -5,10 +5,10 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 MODEL_PATH = ROOT / "models" / "mediapipe" / "hand_landmarker.task"
 IMAGE_DIR = ROOT / "data" / "exported" / "data"
-OUTPUT_DIR = ROOT / "data" / "results" / "mediapipe_crop_test"
+OUTPUT_DIR = ROOT / "results" / "mediapipe_crop_test"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 if not MODEL_PATH.exists():

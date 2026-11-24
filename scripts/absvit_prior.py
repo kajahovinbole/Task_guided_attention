@@ -35,7 +35,7 @@ ENSEMBLE_RUN_NAME = "1_2_3_andrea_merged"
 ENSEMBLE_RUN_DIR = ROOT / "results" / "combined_holistic_pose_hand" / ENSEMBLE_RUN_NAME
 PRIOR_DIR = ENSEMBLE_RUN_DIR / "numeric_pointing_prior"
 CHECKPOINT = ROOT / "checkpoints" / "absvit_tiny_patch8_224_gap.pth"
-OUTPUT_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9"
+OUTPUT_DIR = ROOT / "results" / "absvit_prior_test_28x28_lay9"
 # Kartene lagres her slik at evaluate_bbox.py kan bruke dem.
 MAPS_DIR = OUTPUT_DIR / "maps"
 

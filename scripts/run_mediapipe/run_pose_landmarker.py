@@ -14,10 +14,10 @@ from mediapipe.tasks.python import vision
 
 
 # Paths
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 MODEL_PATH = ROOT / "models" / "mediapipe" / "pose_landmarker_lite.task"
 IMAGE_DIR = ROOT / "data/exported/merged/data"
-OUTPUT_DIR = ROOT / "data" / "results" / "pose_landmarker_test_merged1"
+OUTPUT_DIR = ROOT / "results" / "pose_landmarker_test_merged1"
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

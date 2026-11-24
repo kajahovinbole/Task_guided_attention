@@ -5,7 +5,7 @@ from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parent.parent
 IMAGE_DIR = ROOT / "data" / "funker_bra_20okt" / "imgs"
-OUTPUT_DIR = ROOT / "data" / "results" / "yolo_detection"
+OUTPUT_DIR = ROOT / "results" / "yolo_detection"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 

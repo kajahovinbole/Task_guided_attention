@@ -31,8 +31,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 LABELS_PATH = ROOT / "data" / "funker_bra_20okt" / "labels.json"
 IMAGE_DIR = ROOT / "data" / "funker_bra_20okt" / "imgs"
-MAPS_DIR = ROOT / "data" / "results" / "absvit_prior_test_28x28_lay9_s25" / "maps"    #absvit_prior_test
-OUTPUT_DIR = ROOT / "data" / "results" / "bbox_eval_28x28_lay9_s25" #bbox_eval
+MAPS_DIR = ROOT / "results" / "absvit_prior_test_28x28_lay9" / "maps"
+OUTPUT_DIR = ROOT / "results" / "bbox_eval_28x28_lay9"
 
 IMAGE_SIZE = 224
 PATCH_SIZE = 8 #16
