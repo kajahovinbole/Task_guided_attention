@@ -7,10 +7,10 @@ import numpy as np
 
 
 """
-Grønn: valgt pekehånd.
-Rød: hånd som ikke ble valgt.
-Score: vises ved hvert håndledd.
-Ingen valgt hånd: dersom ingen hånd passerer terskelen.
+Green: selected pointing hand.
+Red: hand that was not selected.
+Score: shown at each wrist landmark.
+No selected hand: if no hand passes the threshold.
 """
 
 
@@ -235,12 +235,12 @@ def main():
 
     if not DATA_PATH.is_file():
         raise FileNotFoundError(
-            f"Fant ikke JSON-filen: {DATA_PATH.resolve()}"
+            f"Could not find JSON file: {DATA_PATH.resolve()}"
         )
 
     if not IMAGE_DIR.is_dir():
         raise FileNotFoundError(
-            f"Fant ikke bildemappen: {IMAGE_DIR}"
+            f"Could not find image folder: {IMAGE_DIR}"
         )
 
     with DATA_PATH.open(encoding="utf-8") as f:
@@ -296,7 +296,7 @@ def main():
             images_with_hands += 1
         else:
             images_without_hands += 1
-            print(f"{image_name}: ingen hender funnet")
+            print(f"{image_name}: no hands found")
 
         # Select the highest-scoring hand if it passes threshold.
         if scored:
@@ -320,13 +320,13 @@ def main():
         image_path = find_image(image_name)
 
         if image_path is None:
-            print(f"Fant ikke originalbildet: {image_name}")
+            print(f"Could not find original image: {image_name}")
             continue
 
         image = cv2.imread(str(image_path))
 
         if image is None:
-            print(f"Kunne ikke lese bildet: {image_path}")
+            print(f"Could not read image: {image_path}")
             continue
 
         # Draw each detected hand.
@@ -363,7 +363,7 @@ def main():
         output_path = OUTPUT_DIR / Path(image_name).name
 
         if not cv2.imwrite(str(output_path), image):
-            print(f"Kunne ikke lagre visualisering: {output_path}")
+            print(f"Could not save visualization: {output_path}")
 
         summary.append({
             "image": image_name,
@@ -386,17 +386,17 @@ def main():
 
     # Print summary.
     print("\n" + "=" * 45)
-    print("OPPSUMMERING")
+    print("SUMMARY")
     print("=" * 45)
-    print(f"Bilder i JSON: {total_images}")
-    print(f"Bilder med minst én hånd: {images_with_hands}")
-    print(f"Bilder uten detekterte hender: {images_without_hands}")
-    print(f"Bilder med valgt pekehånd: {images_with_selected_hand}")
-    print(f"Bilder uten valgt pekehånd: {images_without_selected_hand}")
-    print(f"Totalt antall hender scoret: {total_hands_scored}")
-    print(f"Totalt antall valgte hender: {total_hands_selected}")
-    print(f"\nVisualiseringer: {OUTPUT_DIR.resolve()}")
-    print(f"Scorefil: {summary_path.resolve()}")
+    print(f"Images in JSON: {total_images}")
+    print(f"Images with at least one hand: {images_with_hands}")
+    print(f"Images without detected hands: {images_without_hands}")
+    print(f"Images with a selected pointing hand: {images_with_selected_hand}")
+    print(f"Images without a selected pointing hand: {images_without_selected_hand}")
+    print(f"Total hands scored: {total_hands_scored}")
+    print(f"Total hands selected: {total_hands_selected}")
+    print(f"\nVisualizations: {OUTPUT_DIR.resolve()}")
+    print(f"Score file: {summary_path.resolve()}")
 
 
 if __name__ == "__main__":

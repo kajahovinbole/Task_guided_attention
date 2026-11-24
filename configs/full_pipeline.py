@@ -17,7 +17,7 @@ class PipelineConfig:
 
     # Input/output runtime defaults
     output_root: Path = ROOT / "results" / "video_pipeline"
-    max_frames: int | None = None #hele videoen
+    max_frames: int | None = None # entire video
     show_windows: bool = False
 
     # Hand detection and pointing-hand selection
@@ -32,7 +32,7 @@ class PipelineConfig:
     min_saliency_score: float = 0.30
     saliency_weight: float = 1
     yolo_confidence_weight: float = 0
-    score_smoothing_alpha: float = 0.35     #lavere verdi gir mer smoothing
+    score_smoothing_alpha: float = 0.35     # lower value gives more smoothing
     bbox_smoothing_alpha: float = 0.45
     track_switch_margin: float = 0.08
     switch_confirmation_frames: int = 4
@@ -71,38 +71,38 @@ class PipelineConfig:
 
     def __post_init__(self):
         if not 0.0 <= self.min_pointing_score <= 1.0:
-            raise ValueError("min_pointing_score må være mellom 0 og 1.")
+            raise ValueError("min_pointing_score must be between 0 and 1.")
         if not 0.0 <= self.yolo_inference_confidence <= 1.0:
-            raise ValueError("yolo_inference_confidence må være mellom 0 og 1.")
+            raise ValueError("yolo_inference_confidence must be between 0 and 1.")
         if not 0.0 <= self.min_yolo_confidence <= 1.0:
-            raise ValueError("min_yolo_confidence må være mellom 0 og 1.")
+            raise ValueError("min_yolo_confidence must be between 0 and 1.")
         if not 0.0 <= self.min_saliency_score <= 1.0:
-            raise ValueError("min_saliency_score må være mellom 0 og 1.")
+            raise ValueError("min_saliency_score must be between 0 and 1.")
         if self.saliency_weight < 0 or self.yolo_confidence_weight < 0:
-            raise ValueError("Signalvektene kan ikke være negative.")
+            raise ValueError("Signal weights cannot be negative.")
         if self.saliency_weight + self.yolo_confidence_weight <= 0:
-            raise ValueError("Minst én signalvekt må være større enn null.")
+            raise ValueError("At least one signal weight must be greater than zero.")
         if not 0.0 < self.score_smoothing_alpha <= 1.0:
-            raise ValueError("score_smoothing_alpha må være større enn 0 og maks 1.")
+            raise ValueError("score_smoothing_alpha must be greater than 0 and at most 1.")
         if not 0.0 < self.bbox_smoothing_alpha <= 1.0:
-            raise ValueError("bbox_smoothing_alpha må være større enn 0 og maks 1.")
+            raise ValueError("bbox_smoothing_alpha must be greater than 0 and at most 1.")
         if not 0.0 <= self.track_switch_margin <= 1.0:
-            raise ValueError("track_switch_margin må være mellom 0 og 1.")
+            raise ValueError("track_switch_margin must be between 0 and 1.")
         if not 0.0 <= self.track_match_iou_threshold <= 1.0:
-            raise ValueError("track_match_iou_threshold må være mellom 0 og 1.")
+            raise ValueError("track_match_iou_threshold must be between 0 and 1.")
         if self.switch_confirmation_frames <= 0:
-            raise ValueError("switch_confirmation_frames må være positiv.")
+            raise ValueError("switch_confirmation_frames must be positive.")
         if self.track_max_missing_frames < 0:
-            raise ValueError("track_max_missing_frames kan ikke være negativ.")
+            raise ValueError("track_max_missing_frames cannot be negative.")
         if not 0 <= self.selected_missing_grace_frames <= self.track_max_missing_frames:
             raise ValueError(
-                "selected_missing_grace_frames må være mellom 0 og "
+                "selected_missing_grace_frames must be between 0 and "
                 "track_max_missing_frames."
             )
         if not 0.0 <= self.heatmap_opacity <= 1.0:
-            raise ValueError("heatmap_opacity må være mellom 0 og 1.")
+            raise ValueError("heatmap_opacity must be between 0 and 1.")
         if self.yolo_image_size <= 0 or self.hand_crop_size <= 0:
-            raise ValueError("Bildestørrelse og crop-størrelse må være positive.")
+            raise ValueError("Image size and crop size must be positive.")
         if not 0 < self.reach_near_heat_extent <= self.reach_far_heat_extent:
             raise ValueError("Reach heat extents must satisfy 0 < near <= far.")
         if self.reach_elbow_weight < 0 or self.reach_shoulder_weight < 0:

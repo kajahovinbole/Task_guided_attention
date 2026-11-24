@@ -5,9 +5,8 @@ import cv2
 import numpy as np
 
 
-# --------------------------------------------------
+
 # Paths and settings
-# --------------------------------------------------
 
 ROOT = Path(__file__).resolve().parents[2]
 IMAGE_DIR = ROOT / "data" / "3_exported_from_fiftyone" / "1_2_3_andrea_merged" / "data"
@@ -20,9 +19,7 @@ OUTPUT_DIR = ENSEMBLE_RUN_DIR / "pointing_direction_visualizations"
 # Arrow length as a fraction of the image diagonal
 ARROW_LENGTH = 0.25
 
-# --------------------------------------------------
-# Helpers
-# --------------------------------------------------
+
 
 
 def find_image(image_name):

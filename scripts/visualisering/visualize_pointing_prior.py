@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Kjeglen og pekedataene hentes fra create_numeric_prior.py, så
-# visualiseringen alltid viser samme kjegle som AbSViT får.
+# The cone and pointing data come from create_numeric_prior.py, so
+# the visualization always shows the same cone received by AbSViT.
 from scripts.prior.create_numeric_prior import (
     CONE_LENGTH,
     create_cone_heatmap,
@@ -29,7 +29,7 @@ JSON_PATH = ENSEMBLE_RUN_DIR / "ensemble_results.json"
 OUTPUT_DIR = ENSEMBLE_RUN_DIR / "pointing_prior_visualizations"
 
 
-# Styrke på heatmap-overlay
+# Heatmap overlay strength
 OVERLAY_ALPHA = 0.45
 
 
@@ -39,10 +39,10 @@ OVERLAY_ALPHA = 0.45
 
 def overlay_heatmap(image, heatmap):
     """
-    Tegner heatmap oppå originalbildet.
+    Draw the heatmap over the original image.
     """
 
-    # OpenCV bruker BGR
+    # OpenCV uses BGR
     heatmap_uint8 = (heatmap * 255).astype(np.uint8)
 
     colored = cv2.applyColorMap(
@@ -50,7 +50,7 @@ def overlay_heatmap(image, heatmap):
         cv2.COLORMAP_JET,
     )
 
-    # Ikke fargelegg områder med tilnærmet null prior
+    # Do not color areas with an approximately zero prior
     mask = heatmap > 0.02
 
     result = image.copy()
@@ -76,15 +76,15 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     if not JSON_PATH.is_file():
-        raise FileNotFoundError(f"Fant ikke landemerke-JSON: {JSON_PATH}")
+        raise FileNotFoundError(f"Could not find landmark JSON: {JSON_PATH}")
 
     if not IMAGE_DIR.is_dir():
-        raise FileNotFoundError(f"Fant ikke bildemappen: {IMAGE_DIR}")
+        raise FileNotFoundError(f"Could not find image folder: {IMAGE_DIR}")
 
     with JSON_PATH.open(encoding="utf-8") as f:
         data = json.load(f)
 
-    # Støtt både JSON som liste og JSON med "images"-felt.
+    # Support both a JSON list and a JSON object with an "images" field.
     images = data if isinstance(data, list) else data.get("images", [])
 
     processed = 0
@@ -99,13 +99,13 @@ def main():
         image_path = IMAGE_DIR / Path(image_name).name
 
         if not image_path.exists():
-            print(f"Mangler bilde: {image_path}")
+            print(f"Missing image: {image_path}")
             continue
 
         image = cv2.imread(str(image_path))
 
         if image is None:
-            print(f"Kunne ikke lese: {image_path}")
+            print(f"Could not read: {image_path}")
             continue
 
         height, width = image.shape[:2]
@@ -122,7 +122,7 @@ def main():
         else:
             hand_entries = []
 
-        # Ett resultat per hånd
+        # One result per hand
         for hand_index, hand in hand_entries:
             if not isinstance(hand, dict):
                 continue
@@ -162,12 +162,12 @@ def main():
             output_path = OUTPUT_DIR / output_name
 
             if not cv2.imwrite(str(output_path), result):
-                print(f"Kunne ikke lagre: {output_path}")
+                print(f"Could not save: {output_path}")
                 continue
 
             processed += 1
 
-    print(f"Ferdig. Lagret {processed} heatmaps i {OUTPUT_DIR}")
+    print(f"Done. Saved {processed} heatmaps in {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

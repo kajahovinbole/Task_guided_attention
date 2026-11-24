@@ -16,10 +16,11 @@ CONE_LENGTH = 0.60
 CONE_WIDTH = 0.015
 CONE_WIDENING = 0.12
 
-# Kjeglen er like sterk langs hele midtlinjen (ingen avtakende styrke
-# utover). Nærmest fingertuppen trappes den opp lineært fra 0 til 1 over
-# denne avstanden (andel av diagonalen), siden man sjelden peker på noe
-# rett foran hånden. Sett til 0 for full styrke helt fra fingertuppen.
+# The cone has constant strength along the centerline (no decay beyond it).
+# Starting near the fingertip, strength ramps linearly from 0 to 1 over
+# this distance (a fraction of the diagonal), since people rarely point at
+# something directly in front of the hand. Set it to 0 for full strength
+# starting directly at the fingertip.
 CONE_NEAR_RAMP = 0.05
 
 
@@ -34,7 +35,7 @@ def create_cone_heatmap(
     near_ramp_fraction=CONE_NEAR_RAMP,
     longitudinal_decay_fraction=None,
 ):
-    """Returnerer en numerisk heatmap med verdier i [0, 1]."""
+    """Return a numeric heatmap with values in [0, 1]."""
 
     tip_x, tip_y = tip[0] * width, tip[1] * height
     dx, dy = direction
@@ -128,7 +129,7 @@ def get_pointing_data(hand, image_width=None, image_height=None):
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     if not JSON_PATH.is_file():
-        raise FileNotFoundError(f"Fant ikke landemerke-JSON: {JSON_PATH}")
+        raise FileNotFoundError(f"Could not find landmark JSON: {JSON_PATH}")
 
     data = json.loads(JSON_PATH.read_text(encoding="utf-8"))
     generated_count = 0
@@ -160,8 +161,8 @@ def main():
             tip, direction = pointing
             output_name = f"{image_name}_hand_{hand_index}"
 
-            # Bare pekingen lagres. Kjeglen lages i absvit_prior.py,
-            # med riktig sideforhold og rutenett for modellen som brukes.
+            # Only the pointing data is saved. The cone is created in
+            # absvit_prior.py with the correct aspect ratio and model grid.
             np.savez_compressed(
                 OUTPUT_DIR / f"{output_name}.npz",
                 tip=np.asarray(tip, dtype=np.float32),

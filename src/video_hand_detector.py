@@ -39,7 +39,7 @@ class VideoHandDetector:
         hand_path = model_dir / "hand_landmarker.task"
         for path in (holistic_path, hand_path):
             if not path.is_file():
-                raise FileNotFoundError(f"Fant ikke MediaPipe-modellen: {path}")
+                raise FileNotFoundError(f"Could not find MediaPipe model: {path}")
 
         self.crop_size = crop_size
         self.agreement_threshold = agreement_threshold
@@ -48,7 +48,7 @@ class VideoHandDetector:
         if self.crop_output_dir is not None:
             self.crop_output_dir.mkdir(parents=True, exist_ok=True)
         if self.running_mode not in {"image", "video"}:
-            raise ValueError("running_mode må være 'image' eller 'video'.")
+            raise ValueError("running_mode must be 'image' or 'video'.")
         self.vision = mp.tasks.vision
         base_options = mp.tasks.BaseOptions
         mode = (

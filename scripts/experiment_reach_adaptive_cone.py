@@ -175,17 +175,17 @@ def _source_name(source):
 
 def run_experiment(args):
     if not 0.0 < args.score_alpha <= 1.0:
-        raise ValueError("--score-alpha må være større enn 0 og maks 1.")
+        raise ValueError("--score-alpha must be greater than 0 and at most 1.")
     if args.elbow_weight < 0 or args.shoulder_weight < 0:
-        raise ValueError("Score-vektene kan ikke være negative.")
+        raise ValueError("Score weights cannot be negative.")
     if args.elbow_weight + args.shoulder_weight <= 0:
-        raise ValueError("Minst én armvinkel-vekt må være større enn null.")
+        raise ValueError("At least one arm-angle weight must be greater than zero.")
     if not 0.0 <= args.min_pointing_score <= 1.0:
-        raise ValueError("--min-pointing-score må være mellom 0 og 1.")
+        raise ValueError("--min-pointing-score must be between 0 and 1.")
     if not 0 < args.near_heat_extent <= args.far_heat_extent:
-        raise ValueError("Heat extent må oppfylle 0 < nær <= fjern.")
+        raise ValueError("Heat extent must satisfy 0 < near <= far.")
     if args.max_frames is not None and args.max_frames <= 0:
-        raise ValueError("--max-frames må være større enn null.")
+        raise ValueError("--max-frames must be greater than zero.")
 
     output_dir = args.output_dir or (
         ROOT / "results" / "reach_heat_experiment" / _source_name(args.source)
@@ -197,7 +197,7 @@ def run_experiment(args):
 
     capture = cv2.VideoCapture(args.source)
     if not capture.isOpened():
-        raise RuntimeError(f"Kunne ikke åpne videokilde: {args.source}")
+        raise RuntimeError(f"Could not open video source: {args.source}")
 
     fps = float(capture.get(cv2.CAP_PROP_FPS))
     if not math.isfinite(fps) or fps <= 0:
@@ -242,7 +242,7 @@ def run_experiment(args):
                         (2 * width, height),
                     )
                     if not writer.isOpened():
-                        raise RuntimeError(f"Kunne ikke opprette {video_path}")
+                        raise RuntimeError(f"Could not create {video_path}")
 
                 timestamp_ms = max(
                     last_timestamp_ms + 1,
@@ -351,7 +351,7 @@ def run_experiment(args):
                         break
                 frame_index += 1
                 if frame_index % 30 == 0:
-                    print(f"Behandlet {frame_index} frames")
+                    print(f"Processed {frame_index} frames")
     finally:
         capture.release()
         detector.close()
@@ -362,9 +362,9 @@ def run_experiment(args):
 
     if frame_index == 0:
         raise RuntimeError("Videokilden returnerte ingen frames.")
-    print(f"Ferdig: {frame_index} frames")
-    print(f"Sammenligningsvideo: {video_path}")
-    print(f"Målinger: {records_path}")
+    print(f"Done: {frame_index} frames")
+    print(f"Comparison video: {video_path}")
+    print(f"Measurements: {records_path}")
 
 
 def main():

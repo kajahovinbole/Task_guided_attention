@@ -44,10 +44,10 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 for model_path in (HOLISTIC_MODEL, HAND_MODEL):
     if not model_path.exists():
-        raise FileNotFoundError(f"Fant ikke modellen: {model_path}")
+        raise FileNotFoundError(f"Could not find model: {model_path}")
 
 if not IMAGE_DIR.exists():
-    raise FileNotFoundError(f"Fant ikke bildemappen: {IMAGE_DIR}")
+    raise FileNotFoundError(f"Could not find image folder: {IMAGE_DIR}")
 
 
 # ==================================================
@@ -326,7 +326,7 @@ image_paths = sorted(
 )
 
 if not image_paths:
-    raise FileNotFoundError(f"Fant ingen bilder i {IMAGE_DIR}")
+    raise FileNotFoundError(f"No images found in {IMAGE_DIR}")
 
 
 # ==================================================
@@ -344,7 +344,7 @@ with Vision.HandLandmarker.create_from_options(hand_options) as hand_model:
         original = cv2.imread(str(path))
 
         if original is None:
-            print(f"Kunne ikke lese: {path.name}")
+            print(f"Could not read: {path.name}")
             continue
 
         image = original.copy()
@@ -487,7 +487,7 @@ with Vision.HandLandmarker.create_from_options(hand_options) as hand_model:
 with JSON_PATH.open("w", encoding="utf-8") as f:
     json.dump(all_results, f, indent=2, ensure_ascii=False)
 
-print("\nFerdig.")
-print(f"Visualiseringer: {VIS_DIR}")
-print(f"Fallback-crops: {CROP_DIR}")
+print("\nDone.")
+print(f"Visualizations: {VIS_DIR}")
+print(f"Fallback crops: {CROP_DIR}")
 print(f"Landemerker JSON: {JSON_PATH}")

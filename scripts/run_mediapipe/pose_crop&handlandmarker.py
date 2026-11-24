@@ -49,7 +49,7 @@ DUPLICATE_CENTER_THRESHOLD = 0.35
 
 for model_path in (POSE_MODEL, HAND_MODEL):
     if not model_path.is_file():
-        raise FileNotFoundError(f"Fant ikke modellen: {model_path}")
+        raise FileNotFoundError(f"Could not find model: {model_path}")
 
 
 # --------------------------------------------------
@@ -486,7 +486,7 @@ def make_hand_json(candidate, image_w, image_h, hand_number):
 
 if not IMAGE_DIR.is_dir():
     raise FileNotFoundError(
-        f"Fant ikke bildemappen: {IMAGE_DIR}"
+        f"Could not find image folder: {IMAGE_DIR}"
     )
 
 image_paths = sorted(
@@ -496,7 +496,7 @@ image_paths = sorted(
 )
 
 if not image_paths:
-    raise RuntimeError(f"Fant ingen bilder i {IMAGE_DIR}")
+    raise RuntimeError(f"No images found in {IMAGE_DIR}")
 
 json_results = []
 total_hands = 0
@@ -514,7 +514,7 @@ try:
         original = cv2.imread(str(image_path))
 
         if original is None:
-            print(f"Kunne ikke lese bildet: {image_path.name}")
+            print(f"Could not read image: {image_path.name}")
             continue
 
         images_processed += 1
@@ -719,7 +719,7 @@ try:
         print(
             f"{image_path.name}: "
             f"{len(candidates)} kandidater, "
-            f"{len(accepted_hands)} unike hender "
+            f"{len(accepted_hands)} unique hands "
             f"({image_wrist_candidates} fra wrist-crops)"
         )
 
@@ -740,14 +740,14 @@ with open(JSON_PATH, "w", encoding="utf-8") as f:
         ensure_ascii=False,
     )
 
-print("\nFerdig.")
-print(f"Bilder behandlet: {images_processed}")
-print(f"Bilder med minst én hånd funnet: {images_with_hands}")
-print(f"Bilder uten noen hender funnet: {images_no_hands}")
+print("\nDone.")
+print(f"Images processed: {images_processed}")
+print(f"Images with at least one hand found: {images_with_hands}")
+print(f"Images with no hands found: {images_no_hands}")
 
 if images_processed > 0:
     percentage = 100 * images_no_hands / images_processed
-    print(f"Andel bilder uten hender: {percentage:.1f}%")
+    print(f"Percentage of images without hands: {percentage:.1f}%")
 
 print(f"Kandidater fra fullbilder: {total_direct_candidates}")
 print(f"Kandidater fra wrist-crops: {total_wrist_candidates}")

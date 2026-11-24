@@ -1,11 +1,11 @@
-"""Lagrer pekeprioren som egne bilder, til bruk i presentasjoner.
+"""Save the pointing prior as standalone images for presentations.
 
-Leser kartene som absvit_prior.py har lagret i maps/ og lager to
-bilder per hånd, i samme 224x224-format som modellen ser:
-  <navn>_cone.png  : fotoet med kjeglen oppå (samme som panel 1)
-  <navn>_grid.png  : kjeglen delt i ruter, slik modellen faktisk får den
+Reads maps saved by absvit_prior.py in maps/ and creates two
+images per hand in the same 224x224 format used by the model:
+  <name>_cone.png  : photo with the cone overlaid (same as panel 1)
+  <name>_grid.png  : cone divided into grid cells, as received by the model
 
-Kjør fra rotmappen:  uv run scripts/visualisering/export_prior_images.py
+Run from the repository root: uv run scripts/visualisering/export_prior_images.py
 """
 import sys
 from pathlib import Path
@@ -55,7 +55,7 @@ def main():
 
     map_paths = sorted(MAPS_DIR.glob("*.npz"))
     if not map_paths:
-        print(f"Fant ingen kart i {MAPS_DIR}. Kjør scripts/absvit_prior.py først.")
+        print(f"No maps found in {MAPS_DIR}. Run scripts/absvit_prior.py first.")
         return
 
     for map_path in map_paths:
@@ -70,7 +70,7 @@ def main():
         save_image(rgb, heatmap, OUTPUT_DIR / f"{map_path.stem}_cone.png")
         save_image(rgb, patch_prior, OUTPUT_DIR / f"{map_path.stem}_grid.png", grid=True)
 
-    print(f"Lagret {len(map_paths) * 2} bilder i {OUTPUT_DIR}")
+    print(f"Saved {len(map_paths) * 2} images in {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

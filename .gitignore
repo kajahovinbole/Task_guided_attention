@@ -1,17 +1,17 @@
-# Miljø
+# Environment
 .venv/
 __pycache__/
 *.pyc
 
-# Data og sjekkpunkter 
+# Data and checkpoints
 data/
 checkpoints/
 *.pt
 *.pth
 *.tar.gz
 .DS_Store
-# Resultater
+# Results
 results/
 
-# Jupyter-mellomlagring
+# Jupyter cache
 .ipynb_checkpoints/

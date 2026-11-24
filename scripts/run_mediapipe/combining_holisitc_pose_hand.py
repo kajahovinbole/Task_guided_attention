@@ -43,14 +43,14 @@ def main():
     for directory in (OUTPUT_DIR, VIS_DIR, CROP_DIR):
         directory.mkdir(parents=True, exist_ok=True)
     if not IMAGE_DIR.is_dir():
-        raise FileNotFoundError(f"Fant ikke bildemappen: {IMAGE_DIR}")
+        raise FileNotFoundError(f"Could not find image folder: {IMAGE_DIR}")
 
     image_paths = sorted(
         path for path in IMAGE_DIR.iterdir()
         if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
     )
     if not image_paths:
-        raise FileNotFoundError(f"Fant ingen bilder i {IMAGE_DIR}")
+        raise FileNotFoundError(f"No images found in {IMAGE_DIR}")
 
     records = []
     with VideoHandDetector(
@@ -59,7 +59,7 @@ def main():
         for index, path in enumerate(image_paths, start=1):
             image = cv2.imread(str(path))
             if image is None:
-                print(f"Kunne ikke lese {path.name}")
+                print(f"Could not read {path.name}")
                 continue
             height, width = image.shape[:2]
             detected_hands = detector.detect(
@@ -133,7 +133,7 @@ def main():
 
     with JSON_PATH.open("w", encoding="utf-8") as file:
         json.dump(records, file, indent=2, ensure_ascii=False)
-    print("\nFerdig.")
+    print("\nDone.")
     print(f"Visualiseringer: {VIS_DIR}")
     print(f"Fallback-crops: {CROP_DIR}")
     print(f"JSON-resultater: {JSON_PATH}")

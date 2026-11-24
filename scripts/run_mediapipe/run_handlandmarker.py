@@ -19,12 +19,12 @@ VIS_DIR.mkdir(parents=True, exist_ok=True)
 
 if not MODEL_PATH.exists():
     raise FileNotFoundError(
-        f"Fant ikke modellen: {MODEL_PATH}\n"
-        "Legg hand_landmarker.task i prosjektmappen models/."
+        f"Could not find model: {MODEL_PATH}\n"
+        "Place hand_landmarker.task in the project's models/ folder."
     )
 
 if not IMAGE_DIR.exists():
-    raise FileNotFoundError(f"Fant ikke bildemappen: {IMAGE_DIR}")
+    raise FileNotFoundError(f"Could not find image folder: {IMAGE_DIR}")
 
 
 # Find images
@@ -35,7 +35,7 @@ image_paths = sorted(
 )
 
 if not image_paths:
-    raise RuntimeError(f"Fant ingen bilder i {IMAGE_DIR}")
+    raise RuntimeError(f"No images found in {IMAGE_DIR}")
 
 
 # Configure MediaPipe
@@ -57,7 +57,7 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
         image = cv2.imread(str(path))
 
         if image is None:
-            print(f"Hopper over bilde som ikke kunne leses: {path.name}")
+            print(f"Skipping unreadable image: {path.name}")
             continue
 
         height, width = image.shape[:2]
@@ -177,7 +177,7 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(output_path), visual)
 
-        print(f"{path.name}: {len(hands)} hånd(er) funnet")
+        print(f"{path.name}: {len(hands)} hand(s) found")
 
 
 # Save all results
@@ -185,10 +185,10 @@ OUTPUT_JSON.parent.mkdir(parents=True, exist_ok=True)
 with OUTPUT_JSON.open("w", encoding="utf-8") as f:
     json.dump(records, f, indent=2, ensure_ascii=False)
 
-print(f"\nFerdig! Resultater lagret i: {OUTPUT_JSON}")
-print(f"Visualiseringer lagret i: {VIS_DIR}")
-print(f"Bilder behandlet: {len(records)}")
+print(f"\nDone! Results saved in: {OUTPUT_JSON}")
+print(f"Visualizations saved in: {VIS_DIR}")
+print(f"Images processed: {len(records)}")
 print(
-    "Bilder med minst én hånd:",
+    "Images with at least one hand:",
     sum(record["hands_detected"] > 0 for record in records),
 )

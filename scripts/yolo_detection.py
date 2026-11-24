@@ -45,14 +45,14 @@ def detect_objects(model, frame_bgr, confidence=0.05, image_size=640):
 
 def main():
     if not IMAGE_DIR.is_dir():
-        raise FileNotFoundError(f"Fant ikke bildemappen: {IMAGE_DIR}")
+        raise FileNotFoundError(f"Could not find image folder: {IMAGE_DIR}")
 
     image_paths = sorted(
         path for path in IMAGE_DIR.iterdir()
         if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
     )
     if not image_paths:
-        raise FileNotFoundError(f"Fant ingen bilder i: {IMAGE_DIR}")
+        raise FileNotFoundError(f"No images found in: {IMAGE_DIR}")
 
     model = load_yolo_model()
     results = model.predict(

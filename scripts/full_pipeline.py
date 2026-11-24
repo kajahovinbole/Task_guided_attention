@@ -44,9 +44,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def choose_device(requested):
     if requested != "auto":
         if requested == "cuda" and not torch.cuda.is_available():
-            raise RuntimeError("CUDA ble valgt, men er ikke tilgjengelig.")
+            raise RuntimeError("CUDA was selected, but it is unavailable.")
         if requested == "mps" and not torch.backends.mps.is_available():
-            raise RuntimeError("MPS ble valgt, men er ikke tilgjengelig.")
+            raise RuntimeError("MPS was selected, but it is unavailable.")
         return torch.device(requested)
     if torch.backends.mps.is_available():
         return torch.device("mps")
@@ -356,7 +356,7 @@ def run_full_pipeline(
     show = config.show_windows if show is None else show
     max_frames = config.max_frames if max_frames is None else max_frames
     if max_frames is not None and max_frames <= 0:
-        raise ValueError("max_frames må være større enn null.")
+        raise ValueError("max_frames must be greater than zero.")
 
     abs_vit = load_abs_vit_model(config.checkpoint_path, device)
     yolo_model = load_yolo_model(config.yolo_model)
@@ -383,7 +383,7 @@ def run_full_pipeline(
     capture = cv2.VideoCapture(source)
     if not capture.isOpened():
         hand_detector.close()
-        raise RuntimeError(f"Kunne ikke åpne videokilde: {source}")
+        raise RuntimeError(f"Could not open video source: {source}")
 
     fps = float(capture.get(cv2.CAP_PROP_FPS))
     if not np.isfinite(fps) or fps <= 0:
@@ -427,7 +427,7 @@ def run_full_pipeline(
                         str(verification_path), fourcc, fps, (width, height)
                     )
                     if not selected_writer.isOpened() or not verification_writer.isOpened():
-                        raise RuntimeError("Kunne ikke opprette output-videoene.")
+                        raise RuntimeError("Could not create output videos.")
 
                 timestamp_ms = max(
                     last_timestamp_ms + 1,
@@ -583,7 +583,7 @@ def run_full_pipeline(
                 frame_index += 1
                 if frame_index % 30 == 0:
                     total = f"/{frame_count}" if frame_count > 0 else ""
-                    print(f"Behandlet {frame_index}{total} frames")
+                    print(f"Processed {frame_index}{total} frames")
     finally:
         capture.release()
         if selected_writer is not None:
@@ -598,7 +598,7 @@ def run_full_pipeline(
         raise RuntimeError("Videokilden returnerte ingen frames.")
 
     elapsed = time.time() - started
-    print(f"Ferdig: {frame_index} frames på {elapsed:.1f} sekunder")
+    print(f"Done: {frame_index} frames in {elapsed:.1f} seconds")
     print(f"Valgt objekt-video: {selected_path}")
     print(f"Verifiseringsvideo: {verification_path}")
     print(f"Frame-data: {records_path}")

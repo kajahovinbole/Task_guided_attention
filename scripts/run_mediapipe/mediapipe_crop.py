@@ -12,10 +12,10 @@ OUTPUT_DIR = ROOT / "results" / "mediapipe_crop_test"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 if not MODEL_PATH.exists():
-    raise FileNotFoundError(f"Fant ikke modellen: {MODEL_PATH}")
+    raise FileNotFoundError(f"Could not find model: {MODEL_PATH}")
 
 if not IMAGE_DIR.exists():
-    raise FileNotFoundError(f"Fant ikke bildemappen: {IMAGE_DIR}")
+    raise FileNotFoundError(f"Could not find image folder: {IMAGE_DIR}")
 
 image_paths = sorted(
     p for p in IMAGE_DIR.iterdir()
@@ -23,7 +23,7 @@ image_paths = sorted(
 )
 
 if not image_paths:
-    raise RuntimeError(f"Fant ingen bilder i {IMAGE_DIR}")
+    raise RuntimeError(f"No images found in {IMAGE_DIR}")
 
 options = vision.HandLandmarkerOptions(
     base_options=python.BaseOptions(
@@ -43,7 +43,7 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
         image = cv2.imread(str(image_path))
 
         if image is None:
-            print(f"Hopper over bilde som ikke kunne leses: {image_path.name}")
+            print(f"Skipping unreadable image: {image_path.name}")
             continue
 
         height, width = image.shape[:2]
@@ -68,7 +68,7 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
         result = landmarker.detect(mp_image)
         hand_count = len(result.hand_landmarks)
 
-        print(f"{image_path.name}: {hand_count} hånd(er) funnet")
+        print(f"{image_path.name}: {hand_count} hand(s) found")
 
         # Tegn landemerkene i utsnittet.
         for landmarks in result.hand_landmarks:
@@ -82,6 +82,6 @@ with vision.HandLandmarker.create_from_options(options) as landmarker:
         total_hands += hand_count
         processed += 1
 
-print(f"\nFerdig! Bilder behandlet: {processed}")
-print(f"Hender funnet totalt: {total_hands}")
+print(f"\nDone! Images processed: {processed}")
+print(f"Total hands found: {total_hands}")
 print(f"Resultater lagret i: {OUTPUT_DIR}")

@@ -12,21 +12,21 @@ from sklearn.cluster import KMeans
 # ---- Innstillinger ----
 INPUT_DIR = Path("data/exported/export3/data")
 OUTPUT_DIR = Path("data/exported/export3/data_renamed_by_scene")
-N_SCENES = 11  # Endre hvis du har flere scener
+N_SCENES = 11  # Change if you have more scenes
 START_SCENE_NUMBER = 18  # Startnummer for scene-mapper (scene_04, scene_05, ...)
 
 MODEL_NAME = "openai/clip-vit-base-patch32"
 
-# ---- Finn bilder ----
+# ---- Find images ----
 files = sorted(
     p for p in INPUT_DIR.iterdir()
     if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png"}
 )
 
 if not files:
-    raise ValueError(f"Fant ingen bilder i {INPUT_DIR.resolve()}")
+    raise ValueError(f"Could not find images in {INPUT_DIR.resolve()}")
 
-print(f"Fant {len(files)} bilder.")
+print(f"Found {len(files)} images.")
 
 # ---- Last inn CLIP ----
 device = "mps" if torch.backends.mps.is_available() else (
@@ -59,9 +59,9 @@ for i, path in enumerate(files, start=1):
 
 embeddings = np.stack(embeddings)
 
-# ---- Grupper lignende bilder ----
+# ---- Group similar images ----
 if N_SCENES > len(files):
-    raise ValueError("N_SCENES kan ikke være større enn antall bilder.")
+    raise ValueError("N_SCENES cannot be greater than the number of images.")
 
 clustering = KMeans(
     n_clusters=N_SCENES,
@@ -70,7 +70,7 @@ clustering = KMeans(
 )
 labels = clustering.fit_predict(embeddings)
 
-# Gi gruppene stabile nummer basert på originalt filnavn
+# Give groups stable numbers based on the original filename
 clusters = sorted(
     set(labels),
     key=lambda label: min(
@@ -80,7 +80,7 @@ clusters = sorted(
     )
 )
 
-# ---- Kopier og gi nye navn ----
+# ---- Copy and rename files ----
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 records = []
 
@@ -101,7 +101,7 @@ for scene_number, cluster_id in enumerate(clusters, start=START_SCENE_NUMBER):
 
         destination = OUTPUT_DIR / new_name
 
-        # Kopier filen; originalen endres ikke
+        # Copy the file; the original is unchanged
         shutil.copy2(source, destination)
 
         records.append({
@@ -119,5 +119,5 @@ pd.DataFrame(records).to_csv(
     index=False
 )
 
-print(f"\nFerdig! Bilder ligger i {OUTPUT_DIR.resolve()}")
-print("Kontroller grupperingen manuelt før videre bruk.")
+print(f"\nDone! Images are in {OUTPUT_DIR.resolve()}")
+print("Review the grouping manually before continuing.")

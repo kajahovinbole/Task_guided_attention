@@ -28,12 +28,12 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 if not MODEL_PATH.exists():
     raise FileNotFoundError(
-        f"Fant ikke Holistic-modellen: {MODEL_PATH}"
+        f"Could not find Holistic model: {MODEL_PATH}"
     )
 
 if not IMAGE_DIR.exists():
     raise FileNotFoundError(
-        f"Fant ikke bildemappen: {IMAGE_DIR}"
+        f"Could not find image folder: {IMAGE_DIR}"
     )
 
 
@@ -207,7 +207,7 @@ image_paths = sorted(
 
 if not image_paths:
     raise FileNotFoundError(
-        f"Fant ingen JPG-, JPEG- eller PNG-bilder i {IMAGE_DIR}"
+        f"No JPG, JPEG, or PNG images found in {IMAGE_DIR}"
     )
 
 
@@ -221,7 +221,7 @@ with Vision.HolisticLandmarker.create_from_options(options) as model:
         image = cv2.imread(str(path))
 
         if image is None:
-            print(f"Kunne ikke lese bildet: {path.name}")
+            print(f"Could not read image: {path.name}")
             continue
 
         # Resize and pad every image to the same dimensions.
@@ -289,7 +289,7 @@ with Vision.HolisticLandmarker.create_from_options(options) as model:
         )
 
         if not success:
-            print(f"Kunne ikke lagre: {output_path}")
+            print(f"Could not save: {output_path}")
             continue
 
         left_found = bool(left_hand_landmarks)
@@ -304,5 +304,5 @@ with Vision.HolisticLandmarker.create_from_options(options) as model:
         )
 
 
-print(f"\nFerdig. Antall bilder: {len(image_paths)}")
-print(f"Resultatene er lagret i: {OUTPUT_DIR}")
+print(f"\nDone. Image count: {len(image_paths)}")
+print(f"Results saved in: {OUTPUT_DIR}")

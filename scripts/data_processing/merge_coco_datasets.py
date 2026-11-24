@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Endre disse stiene hvis eksportene dine ligger et annet sted.
+# Change these paths if your exports are stored elsewhere.
 EXPORTS = [
     ROOT / "data/exported/1_2_andrea_merged",
     ROOT / "data/exported/export3/data_renamed_by_scene",
@@ -16,11 +16,11 @@ OUTPUT = ROOT / "data/exported/1_2_3_andrea_merged"
 def main():
     output_images = OUTPUT / "data"
 
-    # Ikke overskriv en tidligere sammenslåing.
+    # Do not overwrite an existing merge.
     if OUTPUT.exists():
         raise FileExistsError(
             f"{OUTPUT} finnes allerede. "
-            "Gi OUTPUT en ny mappesti før du kjører skriptet."
+            "Give OUTPUT a new folder path before running the script."
         )
 
     OUTPUT.mkdir(parents=True)
@@ -39,12 +39,12 @@ def main():
         image_dir = export_dir / "data"
 
         if not json_path.exists():
-            raise FileNotFoundError(f"Fant ikke {json_path}")
+            raise FileNotFoundError(f"Could not find {json_path}")
 
         with open(json_path, "r", encoding="utf-8") as f:
             coco = json.load(f)
 
-        # Behold én felles kategori per kategorinavn.
+        # Keep one shared category per category name.
         category_map = {}
 
         for category in coco["categories"]:
@@ -60,7 +60,7 @@ def main():
 
             category_map[category["id"]] = category_ids[name]
 
-        # Lag nye bilde-ID-er og kopier bildene.
+        # Create new image IDs and copy the images.
         image_id_map = {}
 
         for image in coco["images"]:
@@ -69,11 +69,11 @@ def main():
             destination = output_images / filename
 
             if not source.is_file():
-                raise FileNotFoundError(f"Fant ikke bildefilen: {source}")
+                raise FileNotFoundError(f"Could not find image file: {source}")
 
             if destination.exists():
                 raise FileExistsError(
-                    f"Filnavn finnes allerede i sammenslåingen: {filename}"
+                    f"Filename already exists in the merge: {filename}"
                 )
 
             shutil.copy2(source, destination)
@@ -86,12 +86,12 @@ def main():
             merged_images.append(new_image)
             next_image_id += 1
 
-        # Oppdater bilde-ID-er, kategori-ID-er og annoterings-ID-er.
+        # Update image, category, and annotation IDs.
         for annotation in coco["annotations"]:
             if annotation["image_id"] not in image_id_map:
                 raise ValueError(
-                    f"Annotering {annotation['id']} viser til "
-                    f"ukjent bilde-ID {annotation['image_id']}"
+                    f"Annotation {annotation['id']} refers to "
+                    f"unknown image ID {annotation['image_id']}"
                 )
 
             new_annotation = annotation.copy()
@@ -112,7 +112,7 @@ def main():
         "categories": merged_categories,
     }
 
-    # Behold øvrige metadata fra første eksport hvis de finnes.
+    # Keep other metadata from the first export if present.
     with open(EXPORTS[0] / "labels.json", "r", encoding="utf-8") as f:
         original = json.load(f)
 
@@ -123,8 +123,8 @@ def main():
     with open(OUTPUT / "labels.json", "w", encoding="utf-8") as f:
         json.dump(merged_coco, f, indent=2, ensure_ascii=False)
 
-    print("Sammenslåing fullført!")
-    print(f"Bilder: {len(merged_images)}")
+    print("Merge complete!")
+    print(f"Images: {len(merged_images)}")
     print(f"Annoteringer: {len(merged_annotations)}")
     print(f"Kategorier: {len(merged_categories)}")
     print(f"Resultat: {OUTPUT}")

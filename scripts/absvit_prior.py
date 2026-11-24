@@ -1,7 +1,7 @@
-"""Sammenlign bottom-up ViT med AbSViT styrt av en spatial pekeprior.
+"""Compare bottom-up ViT with AbSViT guided by a spatial pointing prior.
 
-Ingen prompt-prior brukes. Skriptet bruker prosjektets eksisterende AbSViT
-modell og scripts.prior.create_numeric_prior.
+No prompt prior is used. The script uses the project's existing AbSViT
+model and scripts.prior.create_numeric_prior.
 """
 from pathlib import Path
 import sys
@@ -52,7 +52,7 @@ def preprocess_rgb(rgb):
 
 
 def load_image(path):
-    """Returnerer (normalisert [1,3,224,224], RGB-array, (W,H))."""
+    """Return (normalized [1,3,224,224], RGB array, (W,H))."""
     image = Image.open(path).convert("RGB")
     rgb = np.asarray(image.resize(
         (IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BICUBIC
@@ -65,7 +65,7 @@ def load_abs_vit_model(checkpoint_path, device="cpu"):
     checkpoint_path = Path(checkpoint_path)
     if not checkpoint_path.is_file():
         raise FileNotFoundError(
-            f"Fant ikke AbSViT patch-8 GAP-checkpoint: {checkpoint_path}"
+            f"Could not find AbSViT patch-8 GAP checkpoint: {checkpoint_path}"
         )
     model = absvit_tiny_patch8_224_gap(pretrained=False)
     checkpoint = torch.load(
@@ -89,7 +89,7 @@ def make_patch_prior(
     cone_near_ramp=CONE_NEAR_RAMP,
     longitudinal_decay_fraction=None,
 ):
-    """Lag pekekjegle med originalt sideforhold, resample til ViT-grid."""
+    """Create a pointing cone with the original aspect ratio and resample it to the ViT grid."""
     small_w = 448
     small_h = round(small_w * image_h / image_w)
     heatmap = create_cone_heatmap(
@@ -145,10 +145,10 @@ def get_token_norm_map(
     td=None,
     attention_layer_from_end=ATTENTION_LAYER_FROM_END,
 ):
-    """Token-norm i et mellomliggende ViT-lag, ikke QK attention-vekter."""
+    """Token norm in an intermediate ViT layer, not QK attention weights."""
     layer = len(model.blocks) - attention_layer_from_end
     if not (1 <= layer <= len(model.blocks)):
-        raise ValueError("Ugyldig ATTENTION_LAYER_FROM_END")
+        raise ValueError("Invalid ATTENTION_LAYER_FROM_END")
 
     tokens = model._pos_embed(model.patch_embed(image_tensor))
     for i in range(layer):
@@ -156,7 +156,7 @@ def get_token_norm_map(
     norms = tokens.norm(dim=-1)[0, model.num_prefix_tokens:]
     side = int(norms.numel() ** 0.5)
     if side * side != norms.numel():
-        raise ValueError(f"Token-antall {norms.numel()} kan ikke formes som kvadrat")
+        raise ValueError(f"Token count {norms.numel()} cannot be reshaped as a square")
     return norms.reshape(side, side)
 
 
@@ -167,7 +167,7 @@ def run_pointing(
     pointing_mask,
     attention_layer_from_end=ATTENTION_LAYER_FROM_END,
 ):
-    """Lag top-down feedback fra pekeprioren og returner token-norm i andre pass."""
+    """Create top-down feedback from the pointing prior and return token norms in the second pass."""
     td = model.feedback(features * pointing_mask * model.feedback_aug)
     return get_token_norm_map(
         model,
@@ -178,7 +178,7 @@ def run_pointing(
 
 
 def mass_in_prior(token_norm_map, patch_prior):
-    """Andel minimumsjustert token-norm i patches der pekeprioren > 0.05."""
+    """Fraction of minimum-adjusted token norm in patches where the pointing prior > 0.05."""
     if patch_prior.max().item() <= 0:
         return float("nan")
     inside = (patch_prior / patch_prior.max()) > 0.05
@@ -200,11 +200,11 @@ def main():
 
     if not CHECKPOINT.is_file():
         raise FileNotFoundError(
-            f"Fant ikke AbSViT patch-8 checkpoint: {CHECKPOINT}. "
-            "Denne modellen trenger et eget patch-8 GAP-checkpoint."
+            f"Could not find AbSViT patch-8 checkpoint: {CHECKPOINT}. "
+            "This model requires a dedicated patch-8 GAP checkpoint."
         )
     if not PRIOR_DIR.is_dir():
-        raise FileNotFoundError(f"Fant ikke prior-mappen: {PRIOR_DIR}")
+        raise FileNotFoundError(f"Could not find prior folder: {PRIOR_DIR}")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     MAPS_DIR.mkdir(parents=True, exist_ok=True)
@@ -212,7 +212,7 @@ def main():
     #model = absvit_tiny_patch16_224(pretrained=False)
     model = load_abs_vit_model(CHECKPOINT)
 
-    print(f"{'bilde':<28} {'tilfeldig':>9} {'bottom-up':>10} {'peking':>9}")
+    print(f"{'image':<28} {'random':>9} {'bottom-up':>10} {'pointing':>9}")
     all_masses = []
 
     for prior_path in sorted(PRIOR_DIR.glob("*.npz")):
@@ -220,7 +220,7 @@ def main():
         image_stem = stem.rsplit("_hand_", 1)[0]
         image_path = find_image(image_stem)
         if image_path is None:
-            print(f"Mangler bilde for {stem}")
+            print(f"Missing image for {stem}")
             continue
 
         with np.load(prior_path) as data:
@@ -234,7 +234,7 @@ def main():
         pointing_mask = prior_to_mask(patch_prior, model.num_prefix_tokens)
 
         with torch.no_grad():
-            # Pass 1 trengs fordi feedbacken bygges fra disse featurene.
+            # Pass 1 is needed because feedback is built from these features.
             features, _, _ = model.forward_features(x)
             baseline_map = get_token_norm_map(model, x)
             pointing_map = run_pointing(model, x, features, pointing_mask)
@@ -284,11 +284,11 @@ def main():
             ("Bottom-up (no feedback)", baseline_map, baseline_fraction),
             ("Pointing top-down", pointing_map, pointing_fraction),
         ]
-        # Samme fargeskala for direkte visuell sammenligning av token-norm.
+        # Use the same color scale for direct visual comparison of token norms.
         shared_min = min(float(baseline_map.min()), float(pointing_map.min()))
         shared_max = max(float(baseline_map.max()), float(pointing_map.max()))
         for ax, (name, token_map, fraction) in zip(axes[1:], results):
-            # Bottom-up får egen skala, peking beholder felles skala.
+            # Bottom-up uses its own scale; pointing keeps the shared scale.
             vmin, vmax = (None, None) if name.startswith("Bottom-up") else (shared_min, shared_max)
             ax.imshow(rgb)
             ax.imshow(
@@ -302,17 +302,17 @@ def main():
             ax.set_xticks([])
             ax.set_yticks([])
         fig.tight_layout()
-        # bbox_inches="tight" tar med titler som ellers kuttes i toppen.
+        # bbox_inches="tight" keeps titles that would otherwise be clipped.
         fig.savefig(OUTPUT_DIR / f"{stem}.png", dpi=110, bbox_inches="tight")
         plt.close(fig)
 
     if not all_masses:
-        print("Fant ingen bilde/prior-par å evaluere.")
+        print("No image/prior pairs found to evaluate.")
         return
 
     mean = np.nanmean(np.asarray(all_masses), axis=0)
-    print(f"{'SNITT':<28} {mean[0]:>9.2f} {mean[1]:>10.2f} {mean[2]:>9.2f}")
-    print(f"\nFigurer lagret i {OUTPUT_DIR}")
+    print(f"{'MEAN':<28} {mean[0]:>9.2f} {mean[1]:>10.2f} {mean[2]:>9.2f}")
+    print(f"\nFigures saved in {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

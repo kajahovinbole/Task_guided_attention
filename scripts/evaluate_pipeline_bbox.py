@@ -279,7 +279,7 @@ def load_dataset(labels_path, image_dir):
         if annotations_by_image.get(image["id"])
     ]
     if not images:
-        raise ValueError("Fant ingen bilder med ikke-crowd fasitbokser i labels.")
+        raise ValueError("Found no images with non-crowd ground-truth boxes in the labels.")
 
     category_ids = {
         annotation["category_id"]
@@ -288,8 +288,8 @@ def load_dataset(labels_path, image_dir):
     }
     if len(category_ids) != 1:
         raise ValueError(
-            "Denne evalueringen forventer én generell fasitklasse for objektet. "
-            f"Fant category_id-verdier: {sorted(category_ids)}"
+            "This evaluation expects one general ground-truth class for the object. "
+            f"Found category_id values: {sorted(category_ids)}"
         )
     return images, annotations_by_image, next(iter(category_ids))
 
@@ -405,11 +405,11 @@ def evaluate_at_iou(rows, threshold):
 
 def run_evaluation(args):
     if args.max_images is not None and args.max_images <= 0:
-        raise ValueError("--max-images må være større enn null.")
+        raise ValueError("--max-images must be greater than zero.")
     if not args.labels.is_file():
-        raise FileNotFoundError(f"Fant ikke COCO-labels: {args.labels}")
+        raise FileNotFoundError(f"Could not find COCO labels: {args.labels}")
     if not args.image_dir.is_dir():
-        raise FileNotFoundError(f"Fant ikke bildemappen: {args.image_dir}")
+        raise FileNotFoundError(f"Could not find image folder: {args.image_dir}")
 
     from configs.full_pipeline import DEFAULT_CONFIG
     from scripts.full_pipeline import (
@@ -520,7 +520,7 @@ def run_evaluation(args):
                 image_path = args.image_dir / image_record["file_name"]
                 frame = cv2.imread(str(image_path))
                 if frame is None:
-                    raise FileNotFoundError(f"Kunne ikke lese bilde: {image_path}")
+                    raise FileNotFoundError(f"Could not read image: {image_path}")
                 height, width = frame.shape[:2]
                 annotations = annotations_by_image[image_record["id"]]
                 gt_boxes = [

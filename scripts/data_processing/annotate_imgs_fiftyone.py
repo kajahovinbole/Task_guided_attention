@@ -12,14 +12,14 @@ image_paths = sorted(
 )
 
 if not image_paths:
-    raise ValueError(f"Fant ingen bilder i {IMAGE_DIR.resolve()}")
+    raise ValueError(f"No images found in {IMAGE_DIR.resolve()}")
 
 dataset = fo.Dataset("pointing_poc_5")
 
 for path in image_paths:
     sample = fo.Sample(filepath=str(path.resolve()))
 
-    # Lagre scene-ID fra filnavnet
+    # Save the scene ID from the filename
     sample["scene_id"] = path.stem.split("_img_")[0]
 
     dataset.add_sample(sample)

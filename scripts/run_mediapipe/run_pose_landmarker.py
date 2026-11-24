@@ -7,9 +7,9 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 """
-- Grønne punkter viser skuldre, albuer og håndledd.
-- Blå linjer viser underarmen.
-- Røde piler viser estimert underarmsretning.
+- Green points show shoulders, elbows, and wrists.
+- Blue lines show the forearms.
+- Red arrows show the estimated forearm direction.
 """
 
 
@@ -22,10 +22,10 @@ OUTPUT_DIR = ROOT / "results" / "pose_landmarker_test_merged1"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 if not MODEL_PATH.exists():
-    raise FileNotFoundError(f"Fant ikke modellen: {MODEL_PATH}")
+    raise FileNotFoundError(f"Could not find model: {MODEL_PATH}")
 
 if not IMAGE_DIR.exists():
-    raise FileNotFoundError(f"Fant ikke bildemappen: {IMAGE_DIR}")
+    raise FileNotFoundError(f"Could not find image folder: {IMAGE_DIR}")
 
 
 # Find images
@@ -35,7 +35,7 @@ image_paths = sorted(
 )
 
 if not image_paths:
-    raise RuntimeError(f"Fant ingen bilder i {IMAGE_DIR}")
+    raise RuntimeError(f"No images found in {IMAGE_DIR}")
 
 
 # MediaPipe Pose Landmarker
@@ -66,7 +66,7 @@ with vision.PoseLandmarker.create_from_options(options) as landmarker:
         image = cv2.imread(str(image_path))
 
         if image is None:
-            print(f"Kunne ikke lese: {image_path.name}")
+            print(f"Could not read: {image_path.name}")
             continue
 
         height, width = image.shape[:2]
@@ -178,12 +178,12 @@ with vision.PoseLandmarker.create_from_options(options) as landmarker:
         total_arms += arms_found
 
         print(
-            f"{image_path.name}: {people} person(er), "
+            f"{image_path.name}: {people} person(s), "
             f"{arms_found} armretninger tegnet"
         )
 
 print("\nFerdig!")
-print(f"Bilder behandlet: {len(image_paths)}")
+print(f"Images processed: {len(image_paths)}")
 print(f"Persondeteksjoner totalt: {total_people}")
 print(f"Armretninger tegnet: {total_arms}")
 print(f"Visualiseringer lagret i: {OUTPUT_DIR}")

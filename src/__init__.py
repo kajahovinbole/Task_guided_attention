@@ -1,3 +1,3 @@
-# her skal kode for å lage modeller osv være
-# all "nødvendig" kode liksom
-# ikke hjelpere eller rydddekode
+# This package contains model implementation code.
+# Include shared "essential" code here.
+# Helper code and cleanup utilities belong elsewhere.

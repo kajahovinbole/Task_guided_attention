@@ -1,1 +1,1 @@
-# her er tanken å ha modell til peking og blikk
+# This package is intended for pointing and gaze models.
