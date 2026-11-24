@@ -36,7 +36,7 @@ ENSEMBLE_RUN_DIR = ROOT / "results" / "combined_holistic_pose_hand" / ENSEMBLE_R
 PRIOR_DIR = ENSEMBLE_RUN_DIR / "numeric_pointing_prior"
 CHECKPOINT = ROOT / "checkpoints" / "absvit_tiny_patch8_224_gap.pth"
 OUTPUT_DIR = ROOT / "results" / "absvit_prior_test_28x28_lay9"
-# Kartene lagres her slik at evaluate_bbox.py kan bruke dem.
+# Kartene lagres her slik at evaluate_focus_bbox.py kan bruke dem.
 MAPS_DIR = OUTPUT_DIR / "maps"
 
 IMAGE_SIZE = 224

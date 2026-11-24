@@ -1,6 +1,7 @@
-"""Mål hvor mye av fokuset som havner innenfor fasit-boksen.
+"""Mål på hvor mye av fokuset som havner innenfor fasit-boksen.
 
-Leser kartene som test_absvit_prior.py lagrer i absvit_prior_test/maps/
+Leser kartene som absvit_prior.py lagrer i
+results/absvit_prior_test_28x28_lay9/maps/
 og boksene i data/funker_bra_20okt/labels.json (COCO: [x, y, bredde,
 høyde] i originalpiksler).
 
@@ -11,7 +12,7 @@ For hvert bilde regnes ut:
   - peking     : andel av token-norm i boksen med peke-feedback
   - treff      : om patchen med sterkest fokus ligger i boksen ("pointing game")
 
-Kjør test_absvit_prior.py først, deretter:  uv run scripts/evaluate_bbox.py
+Kjør absvit_prior.py først, deretter:  uv run scripts/evaluate_focus_bbox.py
 """
 from pathlib import Path
 import csv
