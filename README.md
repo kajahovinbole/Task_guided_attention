@@ -15,6 +15,7 @@ Research code for studying how human cues, especially pointing direction, can gu
 - `scripts/test_absvit_baseline.py`: checkpoint loading and a minimal forward pass.
 - `scripts/absvit_prior.py`: AbSViT experiment using a spatial pointing prior and reusable helpers.
 - `scripts/evaluate_bbox.py`: compares model focus maps with ground-truth boxes.
+- `scripts/evaluate_pipeline_bbox.py`: evaluates the box selected by the video pipeline on still images.
 - `data/`, `results/`, and `checkpoints/`: local inputs and generated artifacts. These folders are ignored by Git and need to be present locally.
 - `main.py`: command-line entry point for the video pipeline.
 - `src/`: reusable video hand detection, temporal object selection, and reach-estimation components.
@@ -53,7 +54,7 @@ The full pipeline takes a video file (or camera index), finds hands with the com
 The pipeline reuses the pointing-hand score from `scripts/prior/score_pointing_hand.py`, pointing geometry from `scripts/prior/create_numeric_prior.py`, AbSViT preprocessing/prior/model helpers from `scripts/absvit_prior.py`, and YOLO frame inference from `scripts/yolo_detection.py`. This keeps image experiments and video processing on the same implementations where their workflows overlap.
 
 ```bash
-uv run python main.py path/to/video.mp4 --show
+uv run main.py path/to/video.mp4 --show
 ```
 
 For a camera, pass its index, usually `0`. The patch-8 GAP checkpoint must be present at `checkpoints/absvit_tiny_patch8_224_gap.pth`; Ultralytics loads `yolo26n.pt` by default.
@@ -70,12 +71,23 @@ The default output folder is `results/video_pipeline/<video-name>/` and contains
 
 Use `--max-frames 100` for a short run or `--output-dir PATH` to choose another output folder. Add `--show` to display both outputs while processing. Device and other tunable model settings are in `configs/full_pipeline.py`.
 
+### Evaluate selected boxes against FiftyOne annotations
+
+The evaluator runs the pipeline's hand detection, prior, YOLO, and object-selection logic against the COCO-style FiftyOne export. Files named `scene_XX_img_YYY` are sorted and treated as video sequences: MediaPipe video mode, reach smoothing, and the temporal object selector retain state within each scene. Other images are treated as independent stills. It also reports a framewise choice for comparison. By default it reads `data/3_exported_from_fiftyone/1_2_3_andrea_merged/labels.json` and the matching `data/` image folder:
+
+```bash
+uv run scripts/evaluate_pipeline_bbox.py --max-images 5 --save-overlays
+uv run scripts/evaluate_pipeline_bbox.py --save-overlays
+```
+
+It writes per-image choices and every YOLO candidate's confidence, saliency score, combined score, IoU to the ground truth, cone overlap, and whether each selector chose it to `per_image.csv`. `metrics.json` reports IoU, hit-rate, AP50, AP75, and mAP@[.50:.95] for both framewise and sequence selection. The framewise result uses the same per-frame detections and focus map but resets the object selector for each image, so it isolates the effect of selector history. The sequence-aware predictions are in `predictions_coco.json`; framewise predictions are in `predictions_framewise_coco.json`. Results go under `results/pipeline_bbox_eval/1_2_3_andrea_merged/`. `--max-images` limits a run; `--labels`, `--image-dir`, and `--output-dir` select other dataset paths. Overlays mark ground truth in green, sequence selection in blue, and framewise choice in yellow. The export has one generic object class, so this evaluates localization and selection rather than predicted class correctness.
+
 ### Experiment with reach-adaptive heat
 
 Compare uniform heat with reach-adaptive heat inside the same fixed cone:
 
 ```bash
-uv run python scripts/experiment_reach_adaptive_cone.py path/to/reach_video.mov --show
+uv run scripts/experiment_reach_adaptive_cone.py path/to/reach_video.mov --show
 ```
 
 The script writes a side-by-side video and per-frame measurements to `results/reach_heat_experiment/<video-name>/`. It uses the same combined hand detector and reach-measurement functions as the full pipeline. The reach score is an experimental 2D pose proxy, not a calibrated distance estimate. Adjust `--near-heat-extent`, `--far-heat-extent`, `--elbow-weight`, `--shoulder-weight`, and `--score-alpha` to compare mappings.
@@ -89,7 +101,7 @@ Cone width can also be adjusted independently with `use_person_scale_adaptive_co
 The preferred MediaPipe pipeline to build on is `combining_holisitc_pose_hand.py`. Both this image-folder script and `scripts/full_pipeline.py` use the shared `VideoHandDetector` implementation in `src/video_hand_detector.py`. It combines Holistic pose/hand detections with the standalone Hand Landmarker and crop fallback, then selects final left/right hand landmarks. The image script uses MediaPipe image mode; the video pipeline uses video mode for frame-to-frame tracking. Its output folder is named after the input dataset folder. With the current input, the ensemble JSON, visualizations, fallback crops, scores, priors, and derived visualizations are grouped under `results/combined_holistic_pose_hand/1_2_3_andrea_merged/`:
 
 ```bash
-uv run python scripts/run_mediapipe/combining_holisitc_pose_hand.py
+uv run scripts/run_mediapipe/combining_holisitc_pose_hand.py
 ```
 
 The other scripts in `scripts/run_mediapipe/` are retained as earlier approaches and experiments. They are useful for comparison and reference; the ensemble script above is the current choice for further development.
@@ -101,8 +113,8 @@ The other scripts in `scripts/run_mediapipe/` are retained as earlier approaches
 The prior generator reads the ensemble JSON produced by `combining_holisitc_pose_hand.py`. It estimates a 2D direction from each final hand's index-finger MCP landmark (5) to its fingertip (8), then writes `.npz` priors and a `manifest.json` alongside the ensemble run:
 
 ```bash
-uv run python scripts/prior/create_numeric_prior.py
-uv run python scripts/visualisering/visualize_pointing_prior.py
+uv run scripts/prior/create_numeric_prior.py
+uv run scripts/visualisering/visualize_pointing_prior.py
 ```
 
 The visualization is saved in `results/combined_holistic_pose_hand/1_2_3_andrea_merged/pointing_prior_visualizations/`.
@@ -112,8 +124,8 @@ The visualization is saved in `results/combined_holistic_pose_hand/1_2_3_andrea_
 These scripts use the ensemble JSON and images in `data/3_exported_from_fiftyone/1_2_3_andrea_merged/data/`:
 
 ```bash
-uv run python scripts/prior/score_pointing_hand.py
-uv run python scripts/visualisering/draw_arrow.py
+uv run scripts/prior/score_pointing_hand.py
+uv run scripts/visualisering/draw_arrow.py
 ```
 
 The score visualizations and `scores.json` are written to `results/combined_holistic_pose_hand/1_2_3_andrea_merged/pointing_hand_scores/`. Arrow visualizations are written to `results/combined_holistic_pose_hand/1_2_3_andrea_merged/pointing_direction_visualizations/`.
@@ -123,14 +135,14 @@ The score visualizations and `scores.json` are written to `results/combined_holi
 The baseline script uses `checkpoints/absvit_tiny.pth`. It reports any missing or unexpected checkpoint weights; shape mismatches are printed and stop execution.
 
 ```bash
-uv run python scripts/test_absvit_baseline.py
+uv run scripts/test_absvit_baseline.py
 ```
 
 The prior experiment expects images under `data/funker_bra_20okt/`, priors under `results/combined_holistic_pose_hand/1_2_3_andrea_merged/numeric_pointing_prior/`, and `checkpoints/absvit_tiny_patch8_224_gap.pth`:
 
 ```bash
-uv run python scripts/absvit_prior.py
-uv run python scripts/evaluate_bbox.py
+uv run scripts/absvit_prior.py
+uv run scripts/evaluate_bbox.py
 ```
 
 The experiment writes maps and figures under `data/results/absvit_prior_test_28x28_lay9/`. The bounding-box evaluator reads `data/funker_bra_20okt/labels.json` and those maps, then writes its figures and CSV summary under `data/results/bbox_eval_28x28_lay9/`.

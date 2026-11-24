@@ -1,0 +1,69 @@
+\documentclass[tikz,border=8pt]{standalone}
+\usetikzlibrary{arrows.meta}
+\begin{document}
+\begin{tikzpicture}[
+  font=\sffamily,
+  block/.style args={#1}{draw=#1!80!black, fill=#1!12, rounded corners=2pt,
+    line width=.8pt, align=center, minimum height=9mm, text width=36mm,
+    inner sep=4pt},
+  process/.style args={#1}{draw=#1!80!black, fill=#1!12, rounded corners=2pt,
+    line width=.8pt, align=center, minimum height=9mm, text width=42mm,
+    inner sep=4pt},
+  flow/.style={-{Latex[length=2.1mm]}, line width=.85pt, draw=blue!65!black},
+  optional/.style={-{Latex[length=2mm]}, line width=.75pt, draw=black!55, dashed}
+]
+
+% Input and two parallel columns
+\node[block=gray, text width=40mm] (frame) at (3,0) {Video frame};
+\node[block=blue] (hands) at (-3,-2.5) {MediaPipe};
+\node[block=red] (passone) at (3,-5.7)
+  {AbSViT first forward pass\\Bottom-up attention};
+
+% Left column: hand selection and pointing prior
+\node[block=blue] (point) at (-3,-4.5) {Select pointing hand\\and estimate pointing vector};
+\node[block=blue] (adapt) at (-3,-6) {Optional distance\\estimation};
+\node[block=red] (prior) at (-3,-7.5) {Build pointing prior};
+
+% Right column: feedback and prior-conditioned AbSViT
+\node[block=violet] (feedback) at (3,-7.5)
+  {Image features + pointing prior};
+\node[block=red] (passtwo) at (3,-9.5)
+  {AbSViT second forward pass\\Top-down attention};
+\node[block=red] (focus) at (3,-11.5) {Focus\\(saliency map)};
+
+% YOLO sits beside the middle of the pipeline; scoring is centered below
+\node[block=orange] (yolo) at (9,-4.5) {YOLO detector};
+\node[process=violet] (score) at (3,-13.5)
+  {Score YOLO bboxes based on the focus signal};
+
+% Three outputs in one row
+\node[block=gray, text width=36mm] (selectedout) at (0,-16)
+  {Selected-object video\\Selected bbox \\ (+ Metadata) };
+\node[block=gray, text width=36mm] (verifyout) at (6,-16)
+  {Verification video\\Focus, hands, and YOLO boxes};
+
+% The frame is shared by both model branches and YOLO
+\draw[flow] (frame.west) -- (frame.west -| hands.north) -- (hands.north);
+\draw[flow] (frame.south) -- (passone.north);
+\draw[flow] (frame.east) -- (yolo.north |- frame.east) -- (yolo.north);
+
+% Left and right columns
+\draw[flow] (hands) -- (point);
+\draw[flow] (point) -- (adapt);
+\draw[flow] (adapt) -- (prior);
+\draw[flow] (passone) -- (feedback);
+\draw[flow] (prior.east) -- (feedback.west);
+\draw[flow] (feedback) -- (passtwo);
+\draw[flow] (passtwo) -- (focus);
+\draw[optional] (passone.east) -- ++(10mm,0) |- (focus.east)
+  node[pos=.02, right, font=\scriptsize, align=left, fill=white, inner sep=2pt]
+    {if no valid\\pointing prior};
+
+% Scoring and direct output branches
+\draw[flow] (focus.south) -- (score.north);
+\draw[flow] (yolo.south) |- (score.east);
+\draw[flow] (score.south) -- ++(0,-4mm) -| (selectedout.north);
+\draw[flow] (score.south) -- ++(0,-4mm) -| (verifyout.north);
+
+\end{tikzpicture}
+\end{document}
