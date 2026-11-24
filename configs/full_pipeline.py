@@ -29,6 +29,7 @@ class PipelineConfig:
     # YOLO detections and object-selection signal weights
     yolo_inference_confidence: float = 0.25
     min_yolo_confidence: float = 0.25
+    min_saliency_score: float = 0.30
     saliency_weight: float = 1
     yolo_confidence_weight: float = 0
     score_smoothing_alpha: float = 0.35     #lavere verdi gir mer smoothing
@@ -75,6 +76,8 @@ class PipelineConfig:
             raise ValueError("yolo_inference_confidence må være mellom 0 og 1.")
         if not 0.0 <= self.min_yolo_confidence <= 1.0:
             raise ValueError("min_yolo_confidence må være mellom 0 og 1.")
+        if not 0.0 <= self.min_saliency_score <= 1.0:
+            raise ValueError("min_saliency_score må være mellom 0 og 1.")
         if self.saliency_weight < 0 or self.yolo_confidence_weight < 0:
             raise ValueError("Signalvektene kan ikke være negative.")
         if self.saliency_weight + self.yolo_confidence_weight <= 0:

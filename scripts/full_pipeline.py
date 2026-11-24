@@ -154,6 +154,7 @@ def score_box_with_saliency(saliency, box):
 def score_detections(
     detections,
     min_confidence,
+    min_saliency_score,
     saliency,
     pointing_available,
     saliency_weight,
@@ -167,6 +168,7 @@ def score_detections(
         detection["eligible"] = (
             detection["confidence"] >= min_confidence
             and detection["saliency_score"] is not None
+            and detection["saliency_score"] >= min_saliency_score
             and pointing_available
         )
         detection["selected"] = False
@@ -407,7 +409,7 @@ def run_full_pipeline(
                     key: str(value) if isinstance(value, Path) else value
                     for key, value in asdict(config).items()
                 },
-                "selection_rule": "weighted mean of normalized AbSViT saliency and YOLO confidence; pointing hand and YOLO confidence threshold are required",
+                "selection_rule": "weighted mean of normalized AbSViT saliency and YOLO confidence; pointing prior and minimum YOLO confidence and saliency thresholds are required",
             }, ensure_ascii=False) + "\n")
 
             while max_frames is None or frame_index < max_frames:
@@ -495,6 +497,7 @@ def run_full_pipeline(
                 score_detections(
                     detections,
                     config.min_yolo_confidence,
+                    config.min_saliency_score,
                     focus_map,
                     pointing_available=focus_mode == "pointing_prior",
                     saliency_weight=config.saliency_weight,

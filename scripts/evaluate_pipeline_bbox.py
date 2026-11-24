@@ -610,6 +610,7 @@ def run_evaluation(args):
                 score_detections(
                     detections,
                     config.min_yolo_confidence,
+                    config.min_saliency_score,
                     focus_map,
                     pointing_available=focus_mode == "pointing_prior",
                     saliency_weight=config.saliency_weight,
